@@ -1,0 +1,131 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+//include("./util.dsa");
+
+DTH_VERBOSE = true;
+ 
+function verbose(){
+	if( DTH_VERBOSE ){
+		print.apply(this, arguments);
+	}
+}
+
+function setLinearInterp(oNode, startFrame, endFrame){
+ 	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
+ 	endFrame = typeof endFrame !== 'undefined' ? endFrame : 0;
+	oNode.getPropertyList().forEach( function(oProp){
+		if (oProp.hasKeys()) {	
+			print(oProp.objectName, oProp.getValue());
+			for( var j = 0; j < oProp.getNumKeys(); j++) {
+				oProp.setKeyInterpolationType(j, DzFloatProperty.LINEAR_INTERP);
+				oProp.setValue(oProp.getKeyTime(j), oProp.getValue(j) , DzFloatProperty.LINEAR_INTERP );
+				print(oProp.objectName, j, oProp.getKeyInterpolationType(j));
+			}
+		}	
+	});	
+}
+
+/**********************************************************************
+ * Loads preset `sFilename` with `oTarget` node selected, at frame `startframe` 
+ * startFrame = 0 		*/
+function loadPreset(sFilename, oTarget, startFrame)
+{
+ 	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
+	print("Loading", sFilename, "to", oTarget.getLabel(), "at frame", startFrame);
+	Scene.setPrimarySelection(oTarget);
+	Scene.setTime(startFrame);
+	return oContentMgr.openFile(sFilename);
+}
+
+/**********************************************************************
+ *Adds new frames to end of the anim play range. No arguments adds 1 frame.*/
+function addFrameToAnim(iNewFrames){
+ iNewFrames = typeof iNewFrames !== 'undefined' ? iNewFrames : 1;
+	var oTimeRange = new DzTimeRange(0, Scene.getAnimRange().end + Scene.getTimeStep(0) * iNewFrames);
+	Scene.setAnimRange(oTimeRange);
+}
+
+/**********************************************************************
+ *Memorizes figure for `oNode` at `iSourceFrame`, Restores Figure for each frame in `aTargetFrames`.*/
+function setFencePoses(oNode, iSourceFrame, aTargetFrames){
+	var timeStep = Scene.getTimeStep();
+	Scene.selectAllNodes(false);
+	Scene.setPrimarySelection(oNode);
+	Scene.setTime(iSourceFrame * timeStep);
+	print("Memorizing figure for:", oNode.getLabel(), "at frame", iSourceFrame);
+	triggerAction("DzMemorizeFigureAction");	
+	for( var i in aTargetFrames){
+		var frame = aTargetFrames[i];
+		Scene.setTime(frame * timeStep);
+		print("Restoring figure for:", oNode.getLabel(), "at frame", frame);
+		triggerAction("DzRestoreFigureAction");	
+	}
+}
+
+/**********************************************************************
+ *Sets property `sPropName` on `oNode` at time `iFrame`.
+ * iFrame = 0  		*/
+function setPropertyByName(oNode, sPropName, fValue, iFrame){
+ 	iFrame = typeof iFrame !== 'undefined' ? iFrame : 0;
+ 	print("Setting property", oProp.getLabel(), "to", fValue, "at frame", iFrame, "...");
+	oProp = oNode.findProperty(sPropName).objectName;
+	if (oProp && oProp.setValue(iFrame * Scene.getTimeStep(), fValue, DzProperty.Linear)){
+		print("Succesfully set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
+		return true;
+	} else {
+		print("Failed to set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
+		return false;
+	}
+
+}
+
+function loadDufToNode(oNodeRoot, sDufPath, sChildLabel){
+	var oChildNode;
+	if(sChildLabel) 
+		oChildNode = oNodeRoot.findNodeChildByLabel(sChildLabel);
+	if(!oChildNode){
+		Scene.setPrimarySelection(oNodeRoot);
+		print("Loading DUF: ", sDufPath, "to add", sChildLabel, "to node", oNodeRoot.getLabel(), "...");
+		if( oContentMgr.openFile(sDufPath) ) {
+			print("Successfully loaded");
+			return true;
+		} else {
+			print("Failed to load DUF: ", sDufPath, "to add", sChildLabel, "to node", oNodeRoot.getLabel(), "...");
+			return false;
+		}
+	} else {
+		print(sChildLabel, "already exists on node:", oNodeRoot.getLabel());
+		return true;
+	}
+}
+
+print(loadDufToNode);
+
+
+
+function createMorphFrame( oProperty, iFrame, fValue ){
+	if( !oProperty ){
+		print("Error: Property is null.");
+		return false;	
+	}
+	if( !oProperty.inherits("DzFloatProperty")){
+		print("Error: Property is not a DzFloatProperty.");		
+		return false;	
+	}
+		verbose("Property: " + oProperty.getLabel() );
+	var timeStep = Scene.getTimeStep();
+	var tTarget = iFrame * timeStep;
+	var tPrev = iFrame * timeStep - timeStep;
+	var tNext = iFrame * timeStep + timeStep;
+		
+	//Set the target frame to new value		
+	oProperty.setValue(tTarget, fValue);
+	if (tPrev > 0)
+		oProperty.setValue(tPrev, oProperty.getValue(tPrev));
+	if (iFrame + 1 < Scene.getAnimRange().end)
+		oProperty.setValue(tPrev, oProperty.getValue(tPrev));
+
+	print("Set morph frame for", oProperty.getLabel(), "at frame" );
+	return true;
+}
+
