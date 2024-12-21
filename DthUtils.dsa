@@ -120,10 +120,14 @@ function createMorphFrame( oProperty, iFrame, fValue ){
 		
 	//Set the target frame to new value		
 	oProperty.setValue(tTarget, fValue);
-	if (tPrev > 0)
+	if (tPrev > 0){
 		oProperty.setValue(tPrev, oProperty.getValue(tPrev));
-	if (iFrame + 1 < Scene.getAnimRange().end)
-		oProperty.setValue(tPrev, oProperty.getValue(tPrev));
+		verbose("Property " + oProperty.getLabel() + " set at frame " tPrev/timeStep " to " oProperty.getValue(tPrev));
+	}
+	if (iFrame + 1 < Scene.getAnimRange().end){
+		oProperty.setValue(tNext, oProperty.getValue(tNext));
+		verbose("Property " + oProperty.getLabel() + " set at frame " tNext/timeStep " to " oProperty.getValue(tNext));
+	}
 
 	print("Set morph frame for", oProperty.getLabel(), "at frame" );
 	return true;
