@@ -1,0 +1,101 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+var oNode = Scene.getPrimarySelection();
+
+function getProps(oNode)
+{
+	oNode.getPropertyList().forEach( function(oProp){
+		if (oProp.hasKeys()) {	
+			print(oProp.objectName, oProp.getValue());
+			for( var j = 1; j < oProp.getNumKeys(); j++) {			
+				print(oProp.objectName, j, oProp.getKeyTime(j).valueOf()/Scene.getTimeStep() );
+			}
+		}	
+	});	
+}
+var timeStep = Scene.getTimeStep().valueOf();
+
+
+function addFrameKey(idx, key){
+	if (frames[idx] !== undefined)
+		frames[idx].push(key);
+	else
+		frames[idx] = [key];
+}
+
+
+
+function getNodes(oNode){
+	var frames = [];
+	var children = oNode.getNodeChildren(true);
+	var i, j;
+
+	for (i = 0; i < children.length; i++){
+		childNode = children[i];		
+		if(childNode && childNode.inherits("DzNode")){
+			//print(i, childNode.objectName, getNodeParents(childNode));
+			childNode.getPropertyList().forEach( function(oProp)
+				{
+				if (oProp.hasKeys() && oProp.getNumKeys() > 1) // Don't get keys that only exist on the first frame 
+			  {	
+					var keyTimes = [];
+					for(j = 0; j < oProp.getNumKeys(); j++) 
+					{
+						var keyTime = oProp.getKeyTime(j);
+						var frameIdx = keyTime.valueOf() / timeStep;
+						var key = {
+							frameIdx:  frameIdx,
+							nodeName:  childNode.objectName,
+							propName:  oProp.objectName,
+							propValue: oProp.getValue(keyTime),
+							nodeName:  childNode.objectName
+						};
+						
+						keyTimes.push(frameIdx);
+						addFrameKey(frameIdx, key);
+					}
+				}
+					//print(childNode.objectName, oProp.objectName, oProp.getValue(), keyTimes);
+			});
+		}
+	}
+	
+	printFrames(frames);
+}
+
+
+
+function printFrames(frames){
+	for (i = 4; i < frames.length; i++){
+		var frameKeys = frames[i];
+		if(frameKeys !== undefined){	
+			print("Frame", i);	
+			if (frameKeys.length > 80) //A regular frame shouldn't have anywhere near this
+				continue;
+			for (j = 1; j < frameKeys.length; j++)
+			{
+				var frameKey = frameKeys[j];
+				for (k = 0; k < Object.keys(frameKey).length; k++)
+				{
+					var keyProp = Object.keys(frameKey)[k];
+					print("  ", keyProp, ":", frameKey[keyProp]);
+				} 
+			}
+		}
+	}
+}
+
+function getNodeParents(oNode){
+	parents = [];
+	if(oNode && oNode.inherits("DzNode"))
+	{
+		parent = oNode.getNodeParent();
+		while (parent){
+			parents.push(parent.objectName);
+			parent = parent.getNodeParent();	
+		}
+	}
+	return parents;
+}
+
+getNodes(oNode);
