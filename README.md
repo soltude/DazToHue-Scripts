@@ -2,7 +2,7 @@
 
 ## DthAddMorphFrameFromSelection
 
-Invokable user script. 
+Invokable user script. Adds a key for a morph or property and sets keys around it. 
 
 	1. Create a custom action for the script and bind a keyboard shortcut to it. 
 	2. Scrub to the frame you want to create a morph on. 
@@ -22,8 +22,8 @@ After these first three columns, groups of three columns specify a morph or prop
 	|nodeName, propName, propValue
 
 e.g.  
-	4,,,l_toes,XRotate,-60
-	306,,,|r_upperarm,XRotate,-90,|r_upperarm,YRotate,-45,|r_upperarm,ZRotate,-45|
+    |4,,,l_toes,XRotate,-60
+    |306,,,|r_upperarm,XRotate,-90,|r_upperarm,YRotate,-45,|r_upperarm,ZRotate,-45|
 
 ^(Pipes just to show how the different props get read and written, the actual CSV is just commas.)
 
@@ -46,6 +46,7 @@ Contains functions for automating much of the DTH workflow. Included by user scr
 ## DthOptions.dsa
 You MUST set the value for `DTH_POSES_PATH` to point the the `DazToHue\Poses\` folder in your Daz library.
 
+|Option | type | description|
 |---|---|---|
 |`sPathDthPoses`|string| Set to point the the `DazToHue\Poses\` folder|
 |`bIncludeFAC`| true | set true to include use the FAC version of the ROM|
@@ -101,7 +102,8 @@ User invokable script, needs to be modified to select CSV files to load. Not wel
 
 ## Caveats
 
-* I've done no unit testing and fairly rudimentary tests in general. Save copies of everything you don't want corrupted, but any user invokable scripts are undo-able. 
-* The timeline range isn't set properly, but all frames seem to be applied properly. Just extend the range after the script. Might fix this later. 
-* The script finds the first node with a given name, so it's possible that the wrong node will have a morph applied to it, but I haven't found that to be the case. 
+* You may have  to click the `toggle override` icon on the parameter pane slider for some morphs if they're driven by a controller and you use them in a morph frame. For instance, the DK9 shaping presets control DK_Shaft_Scale_2, which is used in one of the morph frames. (This is only when you load the CSV onto a character with shaping applied, not when you're creating a CSV which is best done on rest pose G9/DK/GP) 
+* I've done no unit testing and fairly rudimentary tests in general. Save copies of everything you don't want corrupted, but any user invokable scripts should be undo-able. By default, CSV files are overwritten. 
+* The timeline range isn't always set properly, but all frames seem to be applied if the operation comples. Just extend the range after the script. Might fix this later. 
+* The script finds the first node with a given name, so it's possible that the wrong node will have a morph applied to it, but I haven't found that to be the case. If you do, let me know and I might have to use full paths.
 
