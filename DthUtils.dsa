@@ -112,6 +112,8 @@ function setPropertyByName(oNode, sPropName, fValue, iFrame){
 
 }
 
+
+/** deprecated - use loadPreset ***********************/
 function loadDufToNode(oNodeRoot, sDufPath, sChildLabel){
 	var oChildNode;
 	if(sChildLabel) 
@@ -164,7 +166,7 @@ function readPropsCSV(sFilename, frameDatas, iOffset){
 		var i = 0;
 	    while (!oFile.eof()) {
 	        sLine = oFile.readLine();
-	        print("parsing row", i, ":", sLine);
+	        verbose("parsing row", i, ":", sLine);
 	        var row = sLine.split(",");
 	        // first three values are relative frame number, sectionName, and frameName
 	        if(row.length > 2){
@@ -177,7 +179,7 @@ function readPropsCSV(sFilename, frameDatas, iOffset){
 									propName:  row[j+1],
 									propValue: row[j+2] };
 					addFrameData(frameDatas, keyData);
-					print("add frame data. frame:",frameNum, "prop:", row[j+1]);
+					verbose("add frame data. frame:",frameNum, "prop:", row[j+1]);
 	          	}
         	}
           	i++;
@@ -278,13 +280,13 @@ function createMorphFrames( oNode, morphConfigs, iStartFrame){
 
 function applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDatas)
 {
-	print("! Applying frameDatas");
+	verbose("! Applying frameDatas");
 	var successFrameDatas = successFrameDatas || [];
 	var failedFrameDatas = failedFrameDatas || [];
 	if(Scene.getAnimRange().end < frameDatas.length)
 		setTotalFrames(frameDatas.length);
 	for(var i = 0; i < frameDatas.length; i++){
-		print("  applying frame:", i);
+		verbose("  applying frame:", i);
 		var frameData = frameDatas[i];
 		if(frameData){
 			var keyDatas = frameData.keyDatas;

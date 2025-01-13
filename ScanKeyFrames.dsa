@@ -41,7 +41,7 @@ function addKeysFromProp(frameDatas, oNode, oProp, sPropName){
 								propName:  sPropName || oProp.name, // propPath:   getAncestors(childNode),
 								propValue: oProp.getValue(keyTime) };
 				keyTimes.push(frameIdx);
-				verbose("  Adding framedata", keyData.propName, "at frame", frameIdx);
+				// verbose("  Adding framedata", keyData.propName, "at frame", frameIdx);
 				addFrameData(frameDatas, keyData);
 			}
 		}
@@ -91,7 +91,7 @@ function scanNodeForProps(oNode, frameDatas){
 				//print(i, childNode.objectName, getNodeParents(childNode));
 				childNode.getPropertyList().forEach( function(oProp)
 				{
-					verbose("  Adding key from prop:", oProp.name);
+					// verbose("  Adding key from prop:", oProp.name);
 					addKeysFromProp(frameDatas, childNode, oProp);
 				});
 			}

@@ -4,8 +4,8 @@
 var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
 include (dir_self.filePath ("ScanKeyFrames.dsa"));
 
-// CHANGE THIS LINE if you want a different output file.
-var OUT_FILENAME = (dir_self.filePath ("FBMs.CSV"));
+// UNCOMMENT THIS LINE if you want a different output file.
+var OUT_FILENAME = (dir_self.filePath ("JCM+DK+FBM.CSV"));
 
 
 var oNode = Scene.getPrimarySelection();

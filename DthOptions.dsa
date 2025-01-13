@@ -1,9 +1,12 @@
+// Default options for DthWorkflow and userscripts calling it. Can be overridden. 
+
+
+// YOU MUST CHANGE THIS. If using windows, backslashes must be escaped (use two backslashes '\\")
+var DTH_POSES_PATH =  "D:\\DDaz3DLibrary\\DazToHue\\Poses\\",
+
 var options = {
-	//root path for DTH poses
-	// You must set this. If using windows, backslashes must be escaped (use two backslashes '\\" 
-	sPathDthPoses: "D:\\DDaz3DLibrary\\DazToHue\\Poses\\",
-	// set true to include use the FAC version of the ROM
 	bIncludeJCM: true,
+	// set true to include use the FAC version of the ROM
 	bIncludeFAC: true,
 	bIncludeDK: false,
 	bIncludeGP: false,
@@ -14,5 +17,43 @@ var options = {
 	scannedCSV: dir_self.filePath ("OUT.csv"), 
 	successCSV: dir_self.filePath ("OUT_success.csv"),
 	failCSV: dir_self.filePath ("OUT_failed.csv")
-
 };
+
+
+// Set up paths - should only need to change if using custom ROMs
+var sRomPath = DTH_POSES_PATH + "Genesis 9\\";
+var ROM_DK9 = sRomPath + "Common\\Dicktator 9\\DK9 - Dicktator.duf";
+
+var G9_LINEAR_JCM = sRomPath + "Linear\\G9 LINEAR JCM FAC - Base.duf"; 
+var G9_LINEAR_JCM_FAC = sRomPath + "Linear\\G9 LINEAR JCM FAC - Base.duf"; 
+var G9_LINEAR_JCM_FAC_MOUTH = sRomPath + "Linear\\G9 LINEAR JCM FAC - Mouth.duf"; 
+var G9_DQS_JCM = sRomPath + "DQS\\G9 DQS JCM FAC - Base.duf"; 
+var G9_DQS_JCM_FAC_ = sRomPath + "DQS\\G9 DQS JCM FAC - Base.duf"; 
+var G9_DQS_JCM_FAC_MOUTH = sRomPath + "DQS\\G9 DQS JCM FAC - Mouth.duf"; 
+
+
+
+function getRomPaths(options)
+{
+
+	var sJcmROM;
+	var sMouthROM;
+
+	if( !options["bDQS"] )
+	{
+		if( options["bIncludeFAC"] ){
+			sJcmROM = G9_LINEAR_JCM_FAC;
+			sMouthROM = G9_LINEAR_JCM_FAC_MOUTH;
+		} else {
+			sJcmROM = G9_LINEAR_JCM;
+		} 
+	} else {
+		if( options["bIncludeFAC"] ){
+			sJcmROM = G9_DQS_JCM_FAC;
+			sMouthROM = G9_DQS_JCM_FAC_MOUTH;
+		} else {
+			sJcmROM = G9_DQS_JCM;
+		}
+	}
+	return [sJcmROM, sMouthROM];
+}

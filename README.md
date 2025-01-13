@@ -1,5 +1,12 @@
 # DazToHue-Scripts
 
+## Invokable User Scripts
+
+##### DthAddMorphFrameFromSelection
+##### DthScanFrames
+##### DthWorkflowFromCSV
+##### DthWorkflowExample
+
 ## DthAddMorphFrameFromSelection
 
 Invokable user script. Adds a key for a morph or property and sets keys around it. 
@@ -11,7 +18,7 @@ Invokable user script. Adds a key for a morph or property and sets keys around i
 
 ## FrameDatas CSV format
 
-This CSV format should include all the information of a ROM, in a way that can be easily modified from Excel or similar. 
+This CSV format should include all the information of a ROM, in a way that can be easily modified from Excel or similar, and then applied to a Daz figure's timeline.  
 
 Each row corresponds to a frame of animation. The first column is the frame number, the second is the section name (e.g. GEN, PHY, etc.), and the third is the name of the morph to be used in Hou/UE. (These names aren't really implemented yet and are mostly left as empty strings, but hopefully eventually can be used to automate part of the Houdini side of things.)
 
@@ -45,15 +52,18 @@ Invokable user script. Scans frames and records key frames in frameDatas CSV for
 Contains functions for automating much of the DTH workflow. Included by user scripts. 
 
 ## DthOptions.dsa
-You MUST set the value for `DTH_POSES_PATH` to point the the `DazToHue\Poses\` folder in your Daz library.
+
+Contains an options object used by and overrideable in the DthWorkflow scripts.
+
+You MUST set the value for `DTH_POSES_PATH` to point the the `DazToHue\Poses\` folder in your Daz library if you want to load ROM .dufs from the script.
 
 |Option | type | description|
 |---|---|---|
-|`sPathDthPoses`|string| Set to point the the `DazToHue\Poses\` folder|
+|`bIncludeJCM`| true | if true, loads standard ROMs, otherwise loads only CSVs|
 |`bIncludeFAC`| true | set true to include use the FAC version of the ROM|
 |~~~`bIncludeDK`~~~| false|not working|
 |~~~`bIncludeGP`~~~| false|not working|
-|`bDQS`| false| set true to enable Dual Quat Skinning, defaults to linear|
+|`bDQS`| false| set true to enable Dual Quat Skinning, defaults to linear (untested)|
 |`FACsDetailStrength`| 1.0||
 |`FlexionStrength`| 1.0||
 |`extraCSVs`|[string]|paths to FrameData CSVs|
