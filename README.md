@@ -22,6 +22,7 @@ After these first three columns, groups of three columns specify a morph or prop
 	|nodeName, propName, propValue
 
 e.g.  
+
     |4,,,l_toes,XRotate,-60
     |306,,,|r_upperarm,XRotate,-90,|r_upperarm,YRotate,-45,|r_upperarm,ZRotate,-45|
 
