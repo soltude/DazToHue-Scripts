@@ -1,0 +1,11 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+// DthUtils.dsa must exist in the same folder as this script
+var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
+include (dir_self.filePath ("DthUtils.dsa"));
+
+beginUndo();
+
+createMorphFrameFromSelectedProperty(false, true);
+
+acceptUndo("Create Morph Frames");

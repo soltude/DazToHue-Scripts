@@ -1,0 +1,22 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+// DthUtils.dsa must exist in the same folder as this script
+var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
+include (dir_self.filePath ("ScanKeyFrames.dsa"));
+
+// CHANGE THIS LINE if you want a different output file.
+var OUT_FILENAME = (dir_self.filePath ("FBMs.CSV"));
+
+
+var oNode = Scene.getPrimarySelection();
+var aNodes = Scene.getSelectedNodeList();
+print("Anodes: ", aNodes.map(toString).toString());
+var frameDatas = [];
+scanNodesForFrameDatas(aNodes, frameDatas);
+var sOutFilename;
+var oNodeRoot = getNodeRoot(oNode);
+if(oNodeRoot){
+	sOutFilename = OUT_FILENAME || dir_self.filePath(oNodeRoot.getLabel() + ".csv");
+	print("Will write to", sOutFilename);
+}
+printCSV(frameDatas, sOutFilename);
