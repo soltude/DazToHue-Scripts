@@ -1,5 +1,9 @@
 // DAZ Studio version 4.22.0.16 filetype DAZ Script
 
+// DthUtils.dsa must exist in the same folder as this script
+var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
+include (dir_self.filePath ("DthUtils.dsa"));
+DTH_VERBOSE = false;
 var oNode = Scene.getPrimarySelection();
 
 function getProps(oNode)
@@ -13,73 +17,149 @@ function getProps(oNode)
 		}	
 	});	
 }
+
 var timeStep = Scene.getTimeStep().valueOf();
 
 
-function addFrameKey(idx, key){
-	if (frames[idx] !== undefined)
-		frames[idx].push(key);
-	else
-		frames[idx] = [key];
+
+function addKeysFromProp(frameDatas, oNode, oProp, sPropName){
+	var j;
+	var timeStep = Scene.getTimeStep().valueOf();
+	// Don't get keys that only exist on the first frame 
+	if (oProp && oProp.inherits("DzFloatProperty") && oProp.getNumKeys() > 1) 
+	{	
+		var keyTimes = [];
+		for(j = 0; j < oProp.getNumKeys(); j++) 
+		{
+			var keyTime = oProp.getKeyTime(j);
+			// only record a key if its value is different from the reference pose.
+			if(oProp.getValue(keyTime) != oProp.getValue(0))
+			{
+				var frameIdx = keyTime.valueOf() / timeStep;
+				var keyData = { frameIdx:  frameIdx,
+								nodeName:  oNode.objectName,
+								propName:  sPropName || oProp.name, // propPath:   getAncestors(childNode),
+								propValue: oProp.getValue(keyTime) };
+				keyTimes.push(frameIdx);
+				verbose("  Adding framedata", keyData.propName, "at frame", frameIdx);
+				addFrameData(frameDatas, keyData);
+			}
+		}
+		print(childNode.objectName, oProp.getLabel(), keyTimes);
+	}
+	else{
+		// print("WARNING: oProp is not a DzFloatProperty or has only one key:", oProp.getLabel());
+	}
+	//print("Property",oProp.objectName,"has one or fewer keys, not including");
 }
 
 
-
-function getNodes(oNode){
-	var frames = [];
-	var children = oNode.getNodeChildren(true);
-	var i, j;
-
-	for (i = 0; i < children.length; i++){
-		childNode = children[i];		
-		if(childNode && childNode.inherits("DzNode")){
-			//print(i, childNode.objectName, getNodeParents(childNode));
-			childNode.getPropertyList().forEach( function(oProp)
-				{
-				if (oProp.hasKeys() && oProp.getNumKeys() > 1) // Don't get keys that only exist on the first frame 
-			  {	
-					var keyTimes = [];
-					for(j = 0; j < oProp.getNumKeys(); j++) 
-					{
-						var keyTime = oProp.getKeyTime(j);
-						var frameIdx = keyTime.valueOf() / timeStep;
-						var key = {
-							frameIdx:  frameIdx,
-							nodeName:  childNode.objectName,
-							propName:  oProp.objectName,
-							propValue: oProp.getValue(keyTime),
-							nodeName:  childNode.objectName
-						};
-						
-						keyTimes.push(frameIdx);
-						addFrameKey(frameIdx, key);
-					}
-				}
-					//print(childNode.objectName, oProp.objectName, oProp.getValue(), keyTimes);
-			});
+function scanNodesForFrameDatas(aNodes, frameDatas){
+	var frameDatas = frameDatas || [];
+	if(aNodes.length > 0){
+		var oNodeRoot = getNodeRoot(aNodes[0]);
+		if(oNodeRoot && oNodeRoot.inherits("DzNode"))
+		{
+			scanNodeForProps(oNodeRoot, frameDatas);
 		}
 	}
-	
-	printFrames(frames);
+	for (var i = 0; i < aNodes.length; i++)
+	{
+		var oNode = aNodes[i];
+		if(oNode){
+			print("scanning node", oNode.name, "for properties and morphs");
+			scanNodeForMorphs(oNode, frameDatas);
+		}
+	}
+	return frameDatas;
+}
+
+function scanNodeForProps(oNode, frameDatas){
+	var frameDatas = frameDatas || [];
+	if(oNode && oNode.inherits("DzNode"))
+	{	
+		var children = oNode.getNodeChildren(true);
+		children.push(oNode); // to get oNode's own properties
+		var i, j;
+		var timeStep = Scene.getTimeStep().valueOf();
+
+		// Check all normal properties
+		for (i = 0; i < children.length; i++){
+			childNode = children[i];		
+			if(childNode) // && childNode.inherits("DzNode")){
+			{
+				//print(i, childNode.objectName, getNodeParents(childNode));
+				childNode.getPropertyList().forEach( function(oProp)
+				{
+					verbose("  Adding key from prop:", oProp.name);
+					addKeysFromProp(frameDatas, childNode, oProp);
+				});
+			}
+		}
+	}
+	else
+	{
+		print("ERROR: oNode ", oNode.name, "not found or not a DzNode");
+	}
+	return frameDatas;
+}
+
+function scanNodeForMorphs(oNode, frameDatas){
+	var frameDatas = frameDatas || [];
+	if(oNode && oNode.inherits("DzNode"))
+	{	
+		// Check all morphs
+		var oObj = oNode.getObject();
+		if(oObj){
+			for(var i=0; i<oObj.getNumModifiers(); i++)
+			{
+				oMod = oObj.getModifier(i);
+				if(oMod && oMod.inherits("DzMorph"))
+				{
+					oProp = oMod.getValueControl();
+					if(oProp && oProp.getNumKeys() > 1)
+					{
+						print("modifier:", oMod.name, oMod.inherits("DzMorph"));
+						addKeysFromProp(frameDatas, oNode, oProp, oMod.name);
+					}
+				}
+				
+				
+			}
+		}	
+	}
+	else
+	{
+		print("ERROR: oNode ", oNode.name, "not found or not a DzNode");
+	}
+	return frameDatas;
+}
+
+function getAncestors(oNode){
+	var nextParent = oNode.getNodeParent();
+	var ancestors = [];
+	while(nextParent)
+	{
+		ancestors.push(nextParent.objectName);
+		nextParent = nextParent.getNodeParent();
+	}
+	return ancestors;
 }
 
 
 
-function printFrames(frames){
-	for (i = 4; i < frames.length; i++){
-		var frameKeys = frames[i];
-		if(frameKeys !== undefined){	
-			print("Frame", i);	
-			if (frameKeys.length > 80) //A regular frame shouldn't have anywhere near this
+function printFrameDatas(frameDatas){
+	for (i = 1; i < frameDatas.length; i++){
+		var frameData = frameDatas[i];
+		if(frameData !== undefined){	
+			print("Frame", i, "length:", frameData.length);	
+			if (frameData.length > 30) //A regular frame shouldn't have anywhere near this
 				continue;
-			for (j = 1; j < frameKeys.length; j++)
+			for (j = 0; j < frameData.length; j++)
 			{
-				var frameKey = frameKeys[j];
-				for (k = 0; k < Object.keys(frameKey).length; k++)
-				{
-					var keyProp = Object.keys(frameKey)[k];
-					print("  ", keyProp, ":", frameKey[keyProp]);
-				} 
+				var keyData = frameData[j];
+				if(keyData.propValue != 0)
+					print("  ", keyData.nodeName, keyData.propName, keyData.propValue);
 			}
 		}
 	}
@@ -98,4 +178,4 @@ function getNodeParents(oNode){
 	return parents;
 }
 
-getNodes(oNode);
+

@@ -1,0 +1,172 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+// DthUtils.dsa must exist in the same folder as this script
+var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
+include (dir_self.filePath ("DthUtils.dsa"));
+include (dir_self.filePath ("DthOptions.dsa"));
+include (dir_self.filePath ("ScanKeyFrames.dsa"));
+
+
+// Set up paths - should only need to change if using custom ROMs
+var sRomPath = options["sPathDthPoses"] + "Genesis 9\\";
+var ROM_DK9 = sRomPath + "Common\\Dicktator 9\\DK9 - Dicktator.duf";
+
+/*********************************************************************************
+ * Begin Tutorial Script
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */ 
+
+function ApplyDTHWorkflow(options){
+
+	beginUndo();	
+
+	Scene.setTime(0);
+
+	var aNodes = Scene.getSelectedNodeList();
+	var oNode = Scene.getPrimarySelection();
+	var oNodeRoot = getNodeRoot(oNode);
+	if(!oNodeRoot || !oNodeRoot.inherits("DzNode")){
+		print("Error: Node `Genesis 9` not found in scene");
+		return false; }
+	var oNodeMouth = oNodeRoot.findNodeChildByLabel("Genesis 9 Mouth");
+	if(!oNodeMouth && options.bIncludeJCM && options.bIncludeFAC){
+		print("Error: Node `Genesis 9 Mouth` not found in scene");
+		return false; }
+	var oNodeDk9 = oNodeRoot.findNodeChildByLabel("DicktatorG9");
+	if(!oNodeDk9 && options.bIncludeDK){
+		print("Error: Node `DicktatorG9` not found in scene");
+		return false; }
+
+	/**       *****************************************************/
+	print("Applying initial values... ");
+	ApplyInitialValues(options, oNodeRoot)
+
+	/**       *****************************************************/
+	if(options.bIncludeJCM)
+	{
+		print("Applying default ROMs...");
+		if(!ApplyDefaultROMs(options, oNodeRoot, oNodeMouth))
+			return false;
+	}
+
+	/**       *****************************************************/
+	if( options["bIncludeDK"] )
+	{
+		print("Applying DK9 ROMs...");
+		addFramesToAnim(1);
+		var startFrame = Scene.getAnimRange().end / Scene.getTimeStep();
+		ApplyDK9(options, oNodeRoot, oNodeDk9, 617);
+	}
+
+	/** ****************************************************************/
+	print("Creating FrameDatas from extraCSVs");
+	var startFrame = Scene.getAnimRange().end / Scene.getTimeStep();
+	// hack to enable loading only from CSV
+	startFrame = !options.bIncludeJCM ? 0 : startFrame;
+	var frameDatas = CreateFrameDatas(options, startFrame);
+	print("Framedatas length:", frameDatas.length);
+	printCSV(frameDatas, (dir_self.filePath ("OUT.csv")));
+
+	/** ****************************************************************/
+	print("Applying FrameDatas from extraCSVs");
+	var successFrameDatas = [];
+	var failedFrameDatas = [];
+	applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDatas);
+
+	printCSV(successFrameDatas, options["successCSV"] );
+	printCSV(failedFrameDatas, options["failCSV"]);
+
+	/** ****************************************************************/
+	print("Scanning nodes for FrameDatas after operation");
+	var scannedFrameDatas = [];
+	scanNodesForFrameDatas(aNodes, scannedFrameDatas);
+	printCSV(scannedFrameDatas, options["scannedCSV"] );
+
+	/** ****************************************************************/
+	print("Setting keys to linear interpolation");
+	setLinearInterp(oNodeRoot);
+
+	acceptUndo("DK9 Workflow");
+}
+
+
+function CreateFrameDatas(options, startFrame){
+	frameDatas = [];
+	var iOffset = startFrame;
+	print("Loading CSVs starting at frame", iOffset);
+	extraCSVs = options.extraCSVs;
+	if(extraCSVs){
+		for(var i = 0; i < extraCSVs.length; i++){
+			sFilename = extraCSVs[i];
+			print("attempting to read CSV file at:", sFilename);
+			// frameDatas is modified
+			readPropsCSV(sFilename, frameDatas, iOffset);
+			iOffset = frameDatas.length + 1;
+			print(" - New frame count:", iOffset);	
+		}
+	}
+	return frameDatas;
+
+}
+
+function ApplyInitialValues(options, oNodeRoot){
+	//var oContentMgr = App.getContentMgr();
+	// Set default to linear interpolation off the bat, so hopefully it doesn't need to be set later
+	Scene.setDefaultKeyInterpolationType(DzProperty.Linear);
+	if( options["FACsDetailStrength"] > 0 ) {
+		setPropertyByName(oNodeRoot, "facs_ctrl_FACSDetailStrength", options["FACsDetailStrength"], 0) }
+	if( options["FlexionStrength"] > 0 ) {
+		setPropertyByName(oNodeRoot, "body_ctrl_FlexionAutoStrength", options["FACsDetailStrength"], 0) }
+}
+
+
+function ApplyDefaultROMs(options, oNodeRoot, oNodeMouth){
+
+	var ROMs = getRomPaths(options);
+	var sJcmROM = ROMs[0];
+	var sMouthROM = ROMs[1];
+
+	print("Loading JCM ROM: ", sJcmROM);
+	setTotalFrames(617);
+	if( loadPreset(sJcmROM, oNodeRoot) ){
+		print("Successfully loaded pose preset.");
+
+		if( options["bIncludeFAC"] ){
+			print("Loading Mouth ROM: ", sMouthROM);
+			setTotalFrames(617);
+			if(loadPreset(sMouthROM,  oNodeMouth) ){
+				print("Successfully loaded pose preset.");
+				return true;
+		} else {
+				print("Failed loading ROM:", sMouthROM);
+			}
+		}
+	} else {
+		print("Failed loading ROM:", sJcmROM);
+		print("This is a necessary step. Aborting script.");
+	}
+	return false;
+}
+
+
+function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
+	print("Setting fence pose for", oNodeRoot.objectName, "from frame", 0, "to", startFrame);
+	setTotalFrames(670);
+	setFencePoses(oNodeRoot, 0, [startFrame]);
+
+	print("Loading ROM: ", ROM_DK9, "at frame", startFrame);
+	if( !loadPreset(ROM_DK9, oNodeDk9, startFrame) ){
+		print("Failed loading ROM:", ROM_DK9);
+		return false;
+	}
+
+	var aFenceFrames = options["aDK9FenceOffsets"].map(function(x){ return x +  startFrame; }) 
+	print("Setting fence poses for", oNodeDk9.objectName, "from frame", 0, "to", aFenceFrames);
+	//setFencePoses(oNodeDk9, 0, [617, 650, 663, 664, 666, 669]); 
+	//setFencePoses(oNodeDk9, 0, aFenceFrames); 
+	setFencePoses(oNodeDk9, 0, [startFrame]);
+
+	print("Setting keys to linear interpolation");
+	setLinearInterp(oNodeDk9);
+}
+
+

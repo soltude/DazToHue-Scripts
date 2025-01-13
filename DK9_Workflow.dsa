@@ -1,157 +1,121 @@
 // DAZ Studio version 4.22.0.16 filetype DAZ Script
 
 // DthUtils.dsa must exist in the same folder as this script
-include("./DthUtils.dsa");
-
-//The starting point for this workflow is a Genesis 9 figure with Dicktator 9 loaded onto it. The materials for Dicktator 9 have also been copied using the instructions provided with Dicktator 9.
-//
-//Making sure that the timeline is set to frame 0, apply any shaping to Dicktator 9 to get your desired shape of the penis when itâs in its erect state.
-Scene.setTime(0);
-//
-//Youâll also want to apply a starting shape to the anus to get the anus into a neutral restings state, closed but not clenched.
-//
-//You might also want to adjust the shape of the scrotum and testicles.
-//IMPORTANT: Do not change the pose of Dicktator 9, only the shape. The shaft of the penis should remain perfectly straight. The length of the shaft should be whatever you want the length of the penis to be when it is in an erect state.
-//
-//
-//Once youâre happy with the default shape, you need to adjust the Dicktator 9 rigging to fit.
-//Navigate to where the Dicktator 9 content is in your content library.
-//Double-click on 5a Dicktator Selector, then double-click on 5b Adjust Rigging Shaft, then double click on 5c Adjust Rigging Anus.
-//
+var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
+include (dir_self.filePath ("DthUtils.dsa"));
 
 
-var options = {};
+var options = {
+	//root path for DTH poses
+	// You must set this. If using windows, backslashes must be escaped (use two backslashes '\\" 
+	sPathDthPoses: "D:\\DDaz3DLibrary\\DazToHue\\Poses\\",
+	// set true to include use the FAC version of the ROM
+	bIncludeFAC: true,
+	bIncludeDK: true,
+	bIncludeGP: false,
+	bDQS: false,// set true to enable Dual Quat Skinning, defaults to linear
+	FACsDetailStrength: 1.0,
+	FlexionStrength: 1.0,
+	// Offsets for the fence poses, relative to the first frame of the GP9 ROM file
+	aGP9FenceOffsets: [],
+	// Offsets for the fence poses, relative to the first frame of the DK9 ROM file
+	// Ex. The standard offsets as of DTH 1.6.6:
+	aDK9FenceOffsets: [0, 33, 46, 47, 49, 52],
 
-//root path for DTH poses
-// You must set this. If using windows, backslashes must be escaped (use two backslashes '//" 
-options["sPathDthPoses"] = "D:\\DDaz3DLibrary\\DazToHue\\Poses\\";// set true to enable Dual Quat Skinning, defaults to linear
-
-options["bDQS"] = false;
-// set true to include use the FAC version of the ROM
-options["bIncludeFAC"] = true;
-options["bIncludeDK"] = true;
-options["bIncludeGP"] = false;
-
-options["FACsDetailStrength"] = 1.0;
-options["FlexionStrength"] = 1.0;
-
-// Offsets for the fence poses, relative to the first frame of the GP9 ROM file
-options["aGP9FenceOffsets"] = [];
-// Offsets for the fence poses, relative to the first frame of the DK9 ROM file
-// Ex. The standard offsets as of DTH 1.6.6:
-options["aDK9FenceOffsets"] = [0, 33, 46, 47, 49, 52];
+};
 
 
 
-
-// Set up paths - should only need to change if using custom ROMs
-var sRomPath = options["sPathDthPoses"] + "Genesis 9\\";
-var ROM_DK9 = sRomPath + "Common\\Dicktator 9\\DK9 - Dicktator.duf";
-var G9_LINEAR_JCM = sRomPath + "Linear\\G9 LINEAR JCM FAC - Base.duf"; 
-var G9_LINEAR_JCM_FAC = sRomPath + "Linear\\G9 LINEAR JCM FAC - Base.duf"; 
-var G9_LINEAR_JCM_FAC_MOUTH = sRomPath + "Linear\\G9 LINEAR JCM FAC - Mouth.duf"; 
-var G9_DQS_JCM = sRomPath + "DQS\\G9 DQS JCM FAC - Base.duf"; 
-var G9_DQS_JCM_FAC_ = sRomPath + "DQS\\G9 DQS JCM FAC - Base.duf"; 
-var G9_DQS_JCM_FAC_MOUTH = sRomPath + "DQS\\G9 DQS JCM FAC - Mouth.duf"; 
-
-var oNodeRoot;
-var oNodeMouth;
-var oNodeDk9;
-
-var sJcmROM;
-var sMouthROM;
-
-if( !options["bDQS"] )
-{
-	if( options["bIncludeFAC"] ){
-		sJcmROM = G9_LINEAR_JCM_FAC;
-		sMouthROM = G9_LINEAR_JCM_FAC_MOUTH;
-	} else {
-		sJcmROM = G9_LINEAR_JCM;
-	} 
-} else {
-	if( options["bIncludeFAC"] ){
-		sJcmROM = G9_DQS_JCM_FAC;
-		sMouthROM = G9_DQS_JCM_FAC_MOUTH;
-	} else {
-		sJcmROM = G9_DQS_JCM;
-	}
-}
 /*********************************************************************************
  * Begin Tutorial Script
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */ 
 
-var oContentMgr = App.getContentMgr();
-// Set default to linear interpolation off the bat, so hopefully it doesn't need to be set later
-Scene.setDefaultKeyInterpolationType(DzProperty.Linear);
-print("Setting keys to linear interpolation");
-setLinearInterp(oNodeRoot);
+function ApplyDTHWorkflow(options){
 
+	beginUndo();	
 
-if( options["FACsDetailStrength"] > 0 ) {
-	setPropertyByName(oNodeRoot, "facs_ctrl_FACSDetailStrength", options["FACsDetailStrength"], 0)
-}
+	Scene.setTime(0);
 
-if( options["FlexionStrength"] > 0 ) {
-	setPropertyByName(oNodeRoot, "body_ctrl_FlexionAutoStrength", options["FACsDetailStrength"], 0)
-}
+	var oNodeRoot = Scene.getPrimarySelection();
+	if(!oNodeRoot || !oNodeRoot.inherits("DzNode")){
+		print("Error: Node `Genesis 9` not found in scene");
+		return false; }
+	var oNodeMouth = oNodeRoot.findNodeChildByLabel("Genesis 9 Mouth");
+	if(!oNodeMouth && options.bIncludeFAC){
+		print("Error: Node `Genesis 9 Mouth` not found in scene");
+		return false; }
+	var oNodeDk9 = oNodeRoot.findNodeChildByLabel("DicktatorG9");
+	if(!oNodeDk9 && options.bIncludeDK){
+		print("Error: Node `DicktatorG9` not found in scene");
+		return false; }
 
-print(oNode.findProperty("facs_ctrl_FACSDetailStrength").objectName);
-body_ctrl_FlexionAutoStrength
-//Loading a starting ROM
-//For this example, in addition to the Dicktator 9 controls, I also want the character to have the joint corrective morphs as well as the face controls, so to start with Iâm going to load the G9 LINEAR JCM FAC example ROMs onto the character.
+	/**       *****************************************************/
+	print("Applying initial values... ");
+	ApplyInitialValues(options, oNodeRoot)
 
-//Navigate to where the DazToHue pose presets are.
-//Make sure you are on frame 0 of the animation timeline.
-//Make sure that you have the base figure selected in the scene outliner.
-//Hold down the CTRL key on your keyboard and double-click the G9 LINEAR JCM FAC - Base preset.
-//In the dialog box that appears, select the option to Turn Off Limits, then click the Accept button.
-//Make sure you are still on frame 0 of the animation timeline.
-//Select the Genesis 9 Mouth figure in the scene outliner.
-//Hold down the CTRL key on your keyboard and double-click the G9 LINEAR JCM FAC - Mouth preset.
-//In the dialog box that appears, select the option to Turn Off Limits, then click the Accept button.
+	/**       *****************************************************/
+	print("Applying default ROMs...");
+	if(!ApplyDefaultROMs(options, oNodeRoot, oNodeMouth))
+		return false;
 
-
-
-
-print("Loading JCM ROM: ", sJcmROM);
-if( loadPreset(sJcmROM, oNodeRoot) ){
-	print("Successfully loaded pose preset.");
-
-	if( options["bIncludeFAC"] ){
-		print("Loading Mouth ROM: ", sMouthROM);
-		if(loadPreset(sMouthROM,  oNodeMouth) ){
-			print("Successfully loaded pose preset.");
-	} else {
-			print("Failed loading ROM:", sMouthROM);
-		}
+	/**       *****************************************************/
+	if( options["bIncludeDK"] )
+	{
+		print("Applying DK9 ROMs...");
+		addFramesToAnim();
+		var startFrame = Scene.getAnimRange().end / Scene.getTimeStep();
+		ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame);
 	}
-} else {
-	print("Failed loading ROM:", sMouthROM);
-	print("This is a necessary step. Aborting script.");
+
+	/** ****************************************************************/
+	print("Setting keys to linear interpolation");
+	setLinearInterp(oNodeRoot);
+
+	acceptUndo("DK9 Workflow");
+}
+
+function ApplyInitialValues(options, oNodeRoot){
+	//var oContentMgr = App.getContentMgr();
+	// Set default to linear interpolation off the bat, so hopefully it doesn't need to be set later
+	Scene.setDefaultKeyInterpolationType(DzProperty.Linear);
+	if( options["FACsDetailStrength"] > 0 ) {
+		setPropertyByName(oNodeRoot, "facs_ctrl_FACSDetailStrength", options["FACsDetailStrength"], 0) }
+	if( options["FlexionStrength"] > 0 ) {
+		setPropertyByName(oNodeRoot, "body_ctrl_FlexionAutoStrength", options["FACsDetailStrength"], 0) }
+
+}
+
+
+function ApplyDefaultROMs(options, oNodeRoot, oNodeMouth){
+
+	var ROMs = getRomPaths(options);
+	var sJcmROM = ROMs[0];
+	var sMouthROM = ROMs[1];
+
+	print("Loading JCM ROM: ", sJcmROM);
+	if( loadPreset(sJcmROM, oNodeRoot) ){
+		print("Successfully loaded pose preset.");
+
+		if( options["bIncludeFAC"] ){
+			print("Loading Mouth ROM: ", sMouthROM);
+			if(loadPreset(sMouthROM,  oNodeMouth) ){
+				print("Successfully loaded pose preset.");
+				return true;
+		} else {
+				print("Failed loading ROM:", sMouthROM);
+			}
+		}
+	} else {
+		print("Failed loading ROM:", sJcmROM);
+		print("This is a necessary step. Aborting script.");
+	}
 	return false;
 }
 
 
-
-
-//Appending the Dicktator 9 ROM
-
-if( options["bIncludeDK9 "] ){
-	//With our starting ROM loaded, our timeline now runs from frame 0 to frame 616 giving us a total of 617 frames. Now we want to append the Dicktator 9 ROMs to the end of our timeline.
-	//Start by adding one additional frame to the timeline by changing the value of the total frames from 617 to 618.	
-	addFrameToAnim();
-	var startFrame = Scene.getAnimRange().end / Scene.getTimeStep();
-
-	//Make sure you are on frame 0 of the timeline and that you have the Base figure selected in the scene outliner.
-	//Select Edit -> Figure -> Memorize -> Memorise Figure.
-	//Now go to the last frame which in this example would be frame 617 and still with the Base figure selected in the scene outliner, select Edit -> Figure -> Restore -> Restore Figure.
+function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
 	print("Setting fence pose for", oNodeRoot.objectName, "from frame", 0, "to", startFrame);
-	setFencePoses(oNodeRoot, 0, startFrame);
-
-	//Now, still on frame 617 select the Dicktator G9 figure in the scene outliner.
-	//Double-click the DK9 - Dicktator preset.
-	//At this point weâve now loaded the example Dicktator 9 ROM onto our character and our animation timeline has now increased to 670 frames.
+	setFencePoses(oNodeRoot, 0, [startFrame]);
 
 	print("Loading ROM: ", ROM_DK9, "at frame", startFrame);
 	if( !loadPreset(ROM_DK9, oNodeDk9, startFrame) ){
@@ -159,30 +123,51 @@ if( options["bIncludeDK9 "] ){
 		return false;
 	}
 
-	//Setting the fence frames
-	//First, letâs apply the first of the Fence frames.
-	//Make sure you are on frame 0 of the timeline and that you have the Dicktator 9 figure selected in the scene outliner.
-	//Select Edit -> Figure -> Memorize -> Memorise Figure.
-	//
-	//Now go to the first Fence frame of your Dicktator ROM which in this example would be frame 617.
-	//Now, still with the Dicktator 9 figure selected in the scene outliner, select Edit -> Figure -> Restore -> Restore Figure.
-	//
-	//Now, repeat step 24 for each of the remaining Fence frames which in this example would be frames 650, 656, 663, 664, 666 and 669 as indicated in the spreadsheet.
 	var aFenceFrames = options["aDK9FenceOffsets"].map(function(x){ return x +  startFrame; }) 
 	print("Setting fence poses for", oNodeDk9.objectName, "from frame", 0, "to", aFenceFrames);
 	//setFencePoses(oNodeDk9, 0, [617, 650, 663, 664, 666, 669]); 
 	setFencePoses(oNodeDk9, 0, aFenceFrames); 
 
-	//Finally, set all of the keyframes to linear interpolation.
-	//In the timeline pane of Daz Studio, expand the base figure node and click on it.
-	//Hold down the SHIFT key and click on the last node to select them all.
-	//Right-click on base figure node and select Select -> Select All Item Keys (Filtered)
-	//The keys in the timeline should turn yellow.
-	//Now, click on the Interpolation Type button and select Linear.
-
-
+	print("Setting keys to linear interpolation");
+	setLinearInterp(oNodeDk9);
 }
 
+function getRomPaths(options)
+{
+	// Set up paths - should only need to change if using custom ROMs
+	var sRomPath = options["sPathDthPoses"] + "Genesis 9\\";
+	var ROM_DK9 = sRomPath + "Common\\Dicktator 9\\DK9 - Dicktator.duf";
+	var G9_LINEAR_JCM = sRomPath + "Linear\\G9 LINEAR JCM FAC - Base.duf"; 
+	var G9_LINEAR_JCM_FAC = sRomPath + "Linear\\G9 LINEAR JCM FAC - Base.duf"; 
+	var G9_LINEAR_JCM_FAC_MOUTH = sRomPath + "Linear\\G9 LINEAR JCM FAC - Mouth.duf"; 
+	var G9_DQS_JCM = sRomPath + "DQS\\G9 DQS JCM FAC - Base.duf"; 
+	var G9_DQS_JCM_FAC_ = sRomPath + "DQS\\G9 DQS JCM FAC - Base.duf"; 
+	var G9_DQS_JCM_FAC_MOUTH = sRomPath + "DQS\\G9 DQS JCM FAC - Mouth.duf"; 
+
+
+	var sJcmROM;
+	var sMouthROM;
+
+	if( !options["bDQS"] )
+	{
+		if( options["bIncludeFAC"] ){
+			sJcmROM = G9_LINEAR_JCM_FAC;
+			sMouthROM = G9_LINEAR_JCM_FAC_MOUTH;
+		} else {
+			sJcmROM = G9_LINEAR_JCM;
+		} 
+	} else {
+		if( options["bIncludeFAC"] ){
+			sJcmROM = G9_DQS_JCM_FAC;
+			sMouthROM = G9_DQS_JCM_FAC_MOUTH;
+		} else {
+			sJcmROM = G9_DQS_JCM;
+		}
+	}
+	return [sJcmROM, sMouthROM];
+}
+
+ApplyDTHWorkflow(options);
 
 //
 
@@ -190,17 +175,17 @@ if( options["bIncludeDK9 "] ){
 //
 //
 //You might have noticed that the default shaping you applied to Dicktator 9 in step 2 has now gone when viewing frame 617. This is where things can get a little tricky.
-//Unlike the JCM and FAC ROMs, with the Dicktator 9 ROM you will need to art-direct the parameters of Dicktator 9 to get the result youâre after. This is due to the infinite shaping possibilities of Dicktator 9 not to mention the many different shapes and sizes that human penises come in. Because of this, it was impossible to create a base ROM which would work across every possible shape and style of penis.
-//However, Iâve introduced the concept of Fence frames to try to make things a little easier for you. A Fence frame is simply a copy of a figureâs shape and pose. They help to greatly reduce the chance of unwanted drifting between frames of the ROM and allow you to work on small sections of the ROM which need some art direction. In most cases, the Fence frames are just a copy of the figure in its default starting shape and pose, however there is one exception with the Dicktator 9 ROM which weâll cover shortly.
-//The Dicktator 9 ROM is broken up into different sections, with a Fence frame in between each section. Iâve put together this spreadsheet to help you understand the different sections as well as where the Fence frames are located.
+//Unlike the JCM and FAC ROMs, with the Dicktator 9 ROM you will need to art-direct the parameters of Dicktator 9 to get the result youÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂre after. This is due to the infinite shaping possibilities of Dicktator 9 not to mention the many different shapes and sizes that human penises come in. Because of this, it was impossible to create a base ROM which would work across every possible shape and style of penis.
+//However, IÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂve introduced the concept of Fence frames to try to make things a little easier for you. A Fence frame is simply a copy of a figureÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂs shape and pose. They help to greatly reduce the chance of unwanted drifting between frames of the ROM and allow you to work on small sections of the ROM which need some art direction. In most cases, the Fence frames are just a copy of the figure in its default starting shape and pose, however there is one exception with the Dicktator 9 ROM which weÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂll cover shortly.
+//The Dicktator 9 ROM is broken up into different sections, with a Fence frame in between each section. IÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂve put together this spreadsheet to help you understand the different sections as well as where the Fence frames are located.
 //The frame numbers in the spreadsheet assume that the starting frame for the Dicktator 9 section of our ROM is frame 617, as in this example. If your starting ROM was different you will need to offset the frame numbers in the spreadsheet.
 
 //
-//At this stage you should now be able to scrub through the timeline and hopefully the characterâs penis should maintain its base shape throughout, except for the later parts of the Dicktator ROM where itâs meant to change shape a bit.
+//At this stage you should now be able to scrub through the timeline and hopefully the characterÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂs penis should maintain its base shape throughout, except for the later parts of the Dicktator ROM where itÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂs meant to change shape a bit.
 //Art-directing the Dicktator ROM
 //Referring again to the spreadsheet, we can see in the comments column that some of the frames of the Dicktator 9 ROM require art direction from you in order to get the desired results and others you can optionally art direct if you wish.
 //
-//Letâs start with the optional ones which relate to the scrotum and testicles.
+//LetÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂs start with the optional ones which relate to the scrotum and testicles.
 //
 //TIP: You may find it easier to work if you zoom in on the range of the timeline which relates to Dicktator 9.
 //
@@ -210,34 +195,34 @@ if( options["bIncludeDK9 "] ){
 //
 //
 //
-//Letâs take a look at frame 630 which in this example is the frame where the scrotum is bent back.
+//LetÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂs take a look at frame 630 which in this example is the frame where the scrotum is bent back.
 //Locate the corrective morphs for the scrotum under DicktatorG9 -> DazToHue -> Dicktator9 -> Scrotum 
 //Find the parameter called dth_dk9_scrotum_bend_backward and try applying it to see if it improves the deformation.
 //
 //If you decide that you want to apply the corrective morph then remember that you will want to zero out its value on the frames either side of the current frame to maintain that sawtooth interpolation pattern that is described in the Custom ROM Guide.
 //Go through the rest of the scrotum and testicle poses (frames 630 to 649) and apply any of the corrective morphs to get the desired results.
-//TIP: You donât have to apply corrective morphs at 100% their strength. In some cases you might just want to apply a small amount of the corrective morphs effect.
+//TIP: You donÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂt have to apply corrective morphs at 100% their strength. In some cases you might just want to apply a small amount of the corrective morphs effect.
 //
-//Now letâs move on to the next section, the foreskin cover section, which requires some art direction as currently there are no keyframes for it.
+//Now letÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂs move on to the next section, the foreskin cover section, which requires some art direction as currently there are no keyframes for it.
 //The purpose of this section is to define five keyframes which bring the foreskin from its rest position to a position where it is covering the entire gland of the penis.
 //
 //
-//The reason this section is broken up into five poses is because morphs only move linearly. So if it was only a single morph there would certainly be some clipping in between the morph not being applied and being fully applied. Youâll want to keep this linear movement in mind when crafting these five poses.
+//The reason this section is broken up into five poses is because morphs only move linearly. So if it was only a single morph there would certainly be some clipping in between the morph not being applied and being fully applied. YouÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂll want to keep this linear movement in mind when crafting these five poses.
 //
-//Dicktator 9 includes a lot of parameters which control the position and shape of the foreskin and itâs up to you to figure out which ones work best in your case. However, I'll briefly cover how I go about this.
+//Dicktator 9 includes a lot of parameters which control the position and shape of the foreskin and itÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂs up to you to figure out which ones work best in your case. However, I'll briefly cover how I go about this.
 //
-//I generally find that itâs easier to start on the last frame of the foreskin cover section. In this example, that would be frame 655.
+//I generally find that itÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂs easier to start on the last frame of the foreskin cover section. In this example, that would be frame 655.
 //
-//Iâll start by setting the DK_Foreskin Shape 01 parameter all the way to 100.
+//IÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂll start by setting the DK_Foreskin Shape 01 parameter all the way to 100.
 //
 //Due to keyframe interpolation, the value DK_Foreskin Shape 01 parameter will be interpolated back to 0 as we scrub back through the timeline to the previous Fence frame.
 //
-//You can see that weâre getting some clipping of the penis gland so weâll use the other frames in the foreskin cover section to fix this.
-//Now Iâll move to the first frame of the foreskin cover section which in this example would be frame 651. I want the foreskin on this frame to already be slightly above the rim of the gland. This is because of the linear movement of morphs I mentioned earlier. By expanding the tip of the foreskin so that it is wider than the gland, we can help prevent any clipping.
-//Iâll use a combination of various foreskin related parameters such as DK_Foreskin_Stretch parameters as well as others to achieve the result I want.
+//You can see that weÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂre getting some clipping of the penis gland so weÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂll use the other frames in the foreskin cover section to fix this.
+//Now IÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂll move to the first frame of the foreskin cover section which in this example would be frame 651. I want the foreskin on this frame to already be slightly above the rim of the gland. This is because of the linear movement of morphs I mentioned earlier. By expanding the tip of the foreskin so that it is wider than the gland, we can help prevent any clipping.
+//IÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂll use a combination of various foreskin related parameters such as DK_Foreskin_Stretch parameters as well as others to achieve the result I want.
 //
-//Now itâs just a matter of stepping through the rest of the frames and adjusting the various foreskin related parameters to prevent clipping and achieve a desired result.
-//Once youâre done it should look something like this when you scrub through the foreskin cover section of the ROM.
+//Now itÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂs just a matter of stepping through the rest of the frames and adjusting the various foreskin related parameters to prevent clipping and achieve a desired result.
+//Once youÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂre done it should look something like this when you scrub through the foreskin cover section of the ROM.
 //
 //NOTE: The foreskin cover section of the ROM is the most complicated section to deal with. So now that you have that done you can breathe a little easier :)
 //The next section deals with the bending and twisting of the foreskin which only really makes sense when the foreskin is fully covering the penis. That is, the last frame of the foreskin cover section.
@@ -247,18 +232,18 @@ if( options["bIncludeDK9 "] ){
 //Now go to frame 663 and restore it there as well.
 //The foreskin bending and twisting poses should now look correct.
 //Frame 665 deals with the contraction of the penis. You can optionally art-direct the penis contraction pose. For example, you might want to clench the glutes on this frame as well.
-//The next section, frame 667 and 668 deal with the anus opening and contracting respectively. There are no keyframes in this section so youâll want to add them yourself.
+//The next section, frame 667 and 668 deal with the anus opening and contracting respectively. There are no keyframes in this section so youÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂll want to add them yourself.
 //Frame 667 should have the anus opening to the maximum extent according to what you want.
 //Frame 668 should have the anus contracting, or clenching.
 //IMPORTANT: Remember to zero out the values either side of these two keyframes in the usual sawtooth pattern.
 //The final frame, frame 670, is the one which deals with the penis scale. Effectively you want to adjust the available parameters to achieve the length and girth of the penis in its flaccid state. It also comes with some parameters already applied however you will likely want to adjust these to achieve the desired result.
 //IMPORTANT: Do not apply any bending of the penis on the last frame. It should only really adjust the length and girth.
-//Once youâve finished art-directing your Dicktator9 ROM youâll want to set all of the keyframes to linear one last time by repeating steps 26 to 30.
-//NOTE: Because the last frame involves scaling of bones, you will need to export this frame as a skeleton reference frame. Weâll cover this in the next section.
+//Once youÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂve finished art-directing your Dicktator9 ROM youÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂll want to set all of the keyframes to linear one last time by repeating steps 26 to 30.
+//NOTE: Because the last frame involves scaling of bones, you will need to export this frame as a skeleton reference frame. WeÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂll cover this in the next section.
 //Exporting out of Daz
 //TIP: I recommend that you save your Daz scene at this point in case you need to come back to it to make further refinements.
 //
-//Now youâre ready to export your character as both an Fbx animation and an Alembic cache.
+//Now youÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂre ready to export your character as both an Fbx animation and an Alembic cache.
 //
 //Select the root node of your character in the scene outliner.
 //Go to File -> Send To -> Daz To Maya.
@@ -314,128 +299,187 @@ if( options["bIncludeDK9 "] ){
 
 
 
-function verbose(){
-	if( DTH_VERBOSE ){
-		print.apply(this, arguments);
-	}
-}
+// function verbose(){
+// 	if( DTH_VERBOSE ){
+// 		print.apply(this, arguments);
+// 	}
+// }
 
-function setLinearInterp(oNode, startFrame, endFrame){
- 	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
- 	endFrame = typeof endFrame !== 'undefined' ? endFrame : 0;
-	oNode.getPropertyList().forEach( function(oProp){
-		if (oProp.hasKeys()) {	
-			print(oProp.objectName, oProp.getValue());
-			for( var j = 0; j < oProp.getNumKeys(); j++) {
-				oProp.setKeyInterpolationType(j, DzFloatProperty.LINEAR_INTERP);
-				oProp.setValue(oProp.getKeyTime(j), oProp.getValue(j) , DzFloatProperty.LINEAR_INTERP );
-				print(oProp.objectName, j, oProp.getKeyInterpolationType(j));
-			}
-		}	
-	});	
-}
+// function setLinearInterp(oNode){ //, startFrame, endFrame){
+//  	//startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
+//  	//endFrame = typeof endFrame !== 'undefined' ? endFrame : 0;
+// 	oNode.getPropertyList().forEach( function(oProp){
+// 		if (oProp.hasKeys()) {	
+// 			print("Setting linear interp for:", oProp.objectName, oProp.getValue());
+// 			for( var j = 0; j < oProp.getNumKeys(); j++) {
+// 				oProp.setKeyInterpolationType(j, DzFloatProperty.LINEAR_INTERP);
+// 				oProp.setValue(oProp.getKeyTime(j), oProp.getValue(j) , DzFloatProperty.LINEAR_INTERP );
+// 				print(oProp.objectName, j, oProp.getKeyInterpolationType(j));
+// 			}
+// 		}	
+// 	});	
+// }
 
-/**********************************************************************
- * Loads preset `sFilename` with `oTarget` node selected, at frame `startframe` 
- * startFrame = 0 		*/
-function loadPreset(sFilename, oTarget, startFrame)
-{
- 	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
-	print("Loading", sFilename, "to", oTarget.getLabel(), "at frame", startFrame);
-	Scene.setPrimarySelection(oTarget);
-	Scene.setTime(startFrame);
-	return oContentMgr.openFile(sFilename);
-}
+// /**********************************************************************
+//  * Loads preset `sFilename` with `oTarget` node selected, at frame `startframe` 
+//  * startFrame = 0 		*/
+// function loadPreset(sFilename, oTarget, startFrame)
+// {
+//  	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
+// 	print("Loading", sFilename, "to", oTarget.getLabel(), "at frame", startFrame);
+// 	Scene.setPrimarySelection(oTarget);
+// 	Scene.setTime(startFrame);
+// 	return oContentMgr.openFile(sFilename);
+// }
 
-/**********************************************************************
- *Adds new frames to end of the anim play range. No arguments adds 1 frame.*/
-function addFrameToAnim(iNewFrames){
- iNewFrames = typeof iNewFrames !== 'undefined' ? iNewFrames : 1;
-	var oTimeRange = new DzTimeRange(0, Scene.getAnimRange().end + Scene.getTimeStep(0) * iNewFrames);
-	Scene.setAnimRange(oTimeRange);
-}
+// /**********************************************************************
+//  *Adds new frames to end of the anim play range. No arguments adds 1 frame.*/
+// function addFramesToAnim(iNewFrames){
+//  iNewFrames = typeof iNewFrames !== 'undefined' ? iNewFrames : 1;
+// 	var oTimeRange = new DzTimeRange(0, Scene.getAnimRange().end + Scene.getTimeStep(0) * iNewFrames);
+// 	Scene.setAnimRange(oTimeRange);
+// }
 
-/**********************************************************************
- *Memorizes figure for `oNode` at `iSourceFrame`, Restores Figure for each frame in `aTargetFrames`.*/
-function setFencePoses(oNode, iSourceFrame, aTargetFrames){
-	var timeStep = Scene.getTimeStep();
-	Scene.selectAllNodes(false);
-	Scene.setPrimarySelection(oNode);
-	Scene.setTime(iSourceFrame * timeStep);
-	print("Memorizing figure for:", oNode.getLabel(), "at frame", iSourceFrame);
-	triggerAction("DzMemorizeFigureAction");	
-	for( var i in aTargetFrames){
-		var frame = aTargetFrames[i];
-		Scene.setTime(frame * timeStep);
-		print("Restoring figure for:", oNode.getLabel(), "at frame", frame);
-		triggerAction("DzRestoreFigureAction");	
-	}
-}
+// /**********************************************************************
+//  *Memorizes figure for `oNode` at `iSourceFrame`, Restores Figure for each frame in `aTargetFrames`.*/
+// function setFencePoses(oNode, iSourceFrame, aTargetFrames){
+// 	var timeStep = Scene.getTimeStep();
+// 	Scene.selectAllNodes(false);
+// 	Scene.setPrimarySelection(oNode);
+// 	Scene.setTime(iSourceFrame * timeStep);
+// 	print("Memorizing figure for:", oNode.getLabel(), "at frame", iSourceFrame);
+// 	triggerAction("DzMemorizeFigureAction");	
+// 	for( var i in aTargetFrames){
+// 		var frame = aTargetFrames[i];
+// 		Scene.setTime(frame * timeStep);
+// 		print("Restoring figure for:", oNode.getLabel(), "at frame", frame);
+// 		triggerAction("DzRestoreFigureAction");	
+// 	}
+// }
 
-/**********************************************************************
- *Sets property `sPropName` on `oNode` at time `iFrame`.
- * iFrame = 0  		*/
-function setPropertyByName(oNode, sPropName, fValue, iFrame){
- 	iFrame = typeof iFrame !== 'undefined' ? iFrame : 0;
- 	print("Setting property", oProp.getLabel(), "to", fValue, "at frame", iFrame, "...");
-	oProp = oNode.findProperty(sPropName).objectName;
-	if (oProp && oProp.setValue(iFrame * Scene.getTimeStep(), fValue, DzProperty.Linear)){
-		print("Succesfully set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
-		return true;
-	} else {
-		print("Failed to set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
-		return false;
-	}
+// /**********************************************************************
+//  *Sets property `sPropName` on `oNode` at time `iFrame`.
+//  * iFrame = 0  		*/
+// function setPropertyByName(oNode, sPropName, fValue, iFrame){
+//  	iFrame = typeof iFrame !== 'undefined' ? iFrame : 0;
+//  	print("Setting property", oProp.getLabel(), "to", fValue, "at frame", iFrame, "...");
+// 	oProp = oNode.findProperty(sPropName).objectName;
+// 	if (oProp && oProp.setValue(iFrame * Scene.getTimeStep(), fValue, DzProperty.Linear)){
+// 		print("Succesfully set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
+// 		return true;
+// 	} else {
+// 		print("Failed to set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
+// 		return false;
+// 	}
 
-}
+// }
 
-function loadDufToNode(oNodeRoot, sDufPath, sChildLabel){
-	var oChildNode;
-	if(sChildLabel) 
-		oChildNode = oNodeRoot.findNodeChildByLabel(sChildLabel);
-	if(!oChildNode){
-		Scene.setPrimarySelection(oNodeRoot);
-		print("Loading DUF: ", sDufPath, "to add", sChildLabel, "to node", oNodeRoot.getLabel(), "...");
-		if( oContentMgr.openFile(sDufPath) ) {
-			print("Successfully loaded");
-			return true;
-		} else {
-			print("Failed to load DUF: ", sDufPath, "to add", sChildLabel, "to node", oNodeRoot.getLabel(), "...");
-			return false;
-		}
-	} else {
-		print(sChildLabel, "already exists on node:", oNodeRoot.getLabel());
-		return true;
-	}
-}
-
-print(loadDufToNode);
+// function loadDufToNode(oNodeRoot, sDufPath, sChildLabel){
+// 	var oChildNode;
+// 	if(sChildLabel) 
+// 		oChildNode = oNodeRoot.findNodeChildByLabel(sChildLabel);
+// 	if(!oChildNode){
+// 		Scene.setPrimarySelection(oNodeRoot);
+// 		print("Loading DUF: ", sDufPath, "to add", sChildLabel, "to node", oNodeRoot.getLabel(), "...");
+// 		if( oContentMgr.openFile(sDufPath) ) {
+// 			print("Successfully loaded");
+// 			return true;
+// 		} else {
+// 			print("Failed to load DUF: ", sDufPath, "to add", sChildLabel, "to node", oNodeRoot.getLabel(), "...");
+// 			return false;
+// 		}
+// 	} else {
+// 		print(sChildLabel, "already exists on node:", oNodeRoot.getLabel());
+// 		return true;
+// 	}
+// }
 
 
+// // Helper function to parse morph config entry
+// function parseMorphConfig(config) {
+//   if (Array.isArray(config)) {
+//     return config.map(function (item) {
+//       var parts = item.split(":");
+//       return { name: parts[0], value: parseFloat(parts[1]) };
+//     });
+//   } else {
+//     var parts = config.split(":");
+//     return [{ name: parts[0], value: parseFloat(parts[1]) }];
+//   }
+// }
 
-function createMorphFrame( oProperty, iFrame, fValue ){
-	if( !oProperty ){
-		print("Error: Property is null.");
-		return false;	
-	}
-	if( !oProperty.inherits("DzFloatProperty")){
-		print("Error: Property is not a DzFloatProperty.");		
-		return false;	
-	}
-		verbose("Property: " + oProperty.getLabel() );
-	var timeStep = Scene.getTimeStep();
-	var tTarget = iFrame * timeStep;
-	var tPrev = iFrame * timeStep - timeStep;
-	var tNext = iFrame * timeStep + timeStep;
+
+// function createMorphFrames( oNode, morphConfigs, iStartFrame){
+// 	print("Entering createMorphFrames at frame ", iStartFrame, ", creating ", morphConfigs.length, "frames");
+// 	if(!oNode){
+// 		print("oNode null, returning");
+// 	}
+// 	var timeStep = Scene.getTimeStep();
+// 	var iNewFrames = (Scene.getAnimRange().end/timeStep) - iStartFrame + morphConfigs.length;
+// 	addFramesToAnim(iNewFrames);
+
+// 	for( var i in morphConfigs){
+// 		var frameConfig = morphConfigs[i];
+// 		for ( var j in frameConfig){
+// 			var config = frameConfig[i];
+// 			var oProp = oNode.findProperty(config.name);
+// 			if (!oProp) 
+// 				oProp = oNode.findPropertyByLabel(config.name);
+// 			if(!oProp){
+// 				print("property ", config.name, " not found on node", oNode.getLabel());
+// 				continue; }
+// 			var success = createMorphFrame(oProp, iStartFrame + i, config.value);
+
+// 		}
+// 	}
+// }
+
+
+
+// function createMorphFrame( oProperty, iFrame, fValue ){
+// 	if( !oProperty ){
+// 		print("Error: Property is null.");
+// 		return false;	
+// 	}
+// 	if( !oProperty.inherits("DzFloatProperty")){
+// 		print("Error: Property is not a DzFloatProperty.");		
+// 		return false;	
+// 	}
+// 		verbose("Property: " + oProperty.getLabel() );
+// 	var timeStep = Scene.getTimeStep();
+// 	var tTarget = iFrame * timeStep;
+// 	var tPrev = iFrame * timeStep - timeStep;
+// 	var tNext = iFrame * timeStep + timeStep;
 		
-	//Set the target frame to new value		
-	oProperty.setValue(tTarget, fValue);
-	if (tPrev > 0)
-		oProperty.setValue(tPrev, oProperty.getValue(tPrev));
-	if (iFrame + 1 < Scene.getAnimRange().end)
-		oProperty.setValue(tPrev, oProperty.getValue(tPrev));
+// 	// Creates key frames for the property on prev and next frame
+// 	if (tPrev > 0)
+// 		oProperty.setValue(tPrev, oProperty.getValue(tPrev));
+// 	if (iFrame + 1 < Scene.getAnimRange().end)
+// 		oProperty.setValue(tNext, oProperty.getValue(tNext));
+// 	//Set the target frame to new value		
+// 	oProperty.setValue(tTarget, fValue);
 
-	print("Set morph frame for", oProperty.getLabel(), "at frame" );
-	return true;
-}
+// 	print("Set morph frame for", oProperty.getLabel(), "at frame" );
+// 	return true;
+// }
+
+// //root path for DTH poses
+// // You must set this. If using windows, backslashes must be escaped (use two backslashes '\\" 
+// options["sPathDthPoses"] = "D:\\DDaz3DLibrary\\DazToHue\\Poses\\";// set true to enable Dual Quat Skinning, defaults to linear
+
+// options["bDQS"] = false;
+// // set true to include use the FAC version of the ROM
+// options["bIncludeFAC"] = true;
+// options["bIncludeDK"] = true;
+// options["bIncludeGP"] = false;
+
+// options["FACsDetailStrength"] = 1.0;
+// options["FlexionStrength"] = 1.0;
+
+// // Offsets for the fence poses, relative to the first frame of the GP9 ROM file
+// options["aGP9FenceOffsets"] = [];
+// // Offsets for the fence poses, relative to the first frame of the DK9 ROM file
+// // Ex. The standard offsets as of DTH 1.6.6:
+// options["aDK9FenceOffsets"] = [0, 33, 46, 47, 49, 52];
+
 

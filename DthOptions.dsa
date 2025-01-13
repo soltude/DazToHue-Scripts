@@ -1,0 +1,18 @@
+var options = {
+	//root path for DTH poses
+	// You must set this. If using windows, backslashes must be escaped (use two backslashes '\\" 
+	sPathDthPoses: "D:\\DDaz3DLibrary\\DazToHue\\Poses\\",
+	// set true to include use the FAC version of the ROM
+	bIncludeJCM: true,
+	bIncludeFAC: true,
+	bIncludeDK: false,
+	bIncludeGP: false,
+	bDQS: false,// set true to enable Dual Quat Skinning, defaults to linear
+	FACsDetailStrength: 1.0,
+	FlexionStrength: 1.0,
+	extraCSVs:[],
+	scannedCSV: dir_self.filePath ("OUT.csv"), 
+	successCSV: dir_self.filePath ("OUT_success.csv"),
+	failCSV: dir_self.filePath ("OUT_failed.csv")
+
+};

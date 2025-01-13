@@ -1,0 +1,15 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+// DthUtils.dsa must exist in the same folder as this script
+var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
+include (dir_self.filePath ("DthWorkflow.dsa"));
+
+// CHANGE THIS TO your own path to the DazToHue poses folder
+options.sPathDthPoses = "D:\\DDaz3DLibrary\\DazToHue\\Poses\\";
+options.scannedCSV = dir_self.filePath ("OUT.csv");
+options.successCSV = dir_self.filePath ("OUT_success.csv");
+options.failCSV = dir_self.filePath ("OUT_failed.csv");
+options.extraCSVs = [(dir_self.filePath ("DK9.csv"))];
+
+// This operation is undo-able. 
+ApplyDTHWorkflow(options);
