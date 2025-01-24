@@ -7,9 +7,6 @@ include (dir_self.filePath ("DthOptions.dsa"));
 include (dir_self.filePath ("ScanKeyFrames.dsa"));
 
 
-// Set up paths - should only need to change if using custom ROMs
-var sRomPath = options["sPathDthPoses"] + "Genesis 9\\";
-var ROM_DK9 = sRomPath + "Common\\Dicktator 9\\DK9 - Dicktator.duf";
 
 /*********************************************************************************
  * Begin Tutorial Script
@@ -100,7 +97,7 @@ function CreateFrameDatas(options, startFrame){
 			print("attempting to read CSV file at:", sFilename);
 			// frameDatas is modified
 			readPropsCSV(sFilename, frameDatas, iOffset);
-			iOffset = frameDatas.length + 1;
+			iOffset = frameDatas.length;
 			print(" - New frame count:", iOffset);	
 		}
 	}

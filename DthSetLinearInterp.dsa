@@ -1,0 +1,30 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+/**
+ * Invokable user script. 
+ * Creates morph frame and surrounding keys, then advances the timeline one frame. 
+
+*	1. Create a custom action for the script and bind a keyboard shortcut to it. 
+*	2. Select the root Genesis node and any nodes with keys (Mouth, DK, etc.)
+* 	3. Invoke the script
+*/ 
+
+
+// DthUtils.dsa must exist in the same folder as this script
+var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
+include (dir_self.filePath ("DthUtils.dsa"));
+
+beginUndo();
+
+var oNode = Scene.getPrimarySelection();
+var aNodes = Scene.getSelectedNodeList();
+if(aNodes){
+	var endFrame = Scene.getAnimRange().end/Scene.getTimeStep();
+	print("Setting linear interp from frame 0 to", endFrame, "for Node", oNode.getLabel());
+	setLinearInterp(aNodes, 0, endFrame);
+}
+else{
+	print("Node not found. Aborting")
+}
+
+acceptUndo("Create Morph Frames");

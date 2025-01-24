@@ -9,7 +9,9 @@ options.sPathDthPoses = "D:\\DDaz3DLibrary\\DazToHue\\Poses\\";
 options.scannedCSV = dir_self.filePath ("OUT.csv");
 options.successCSV = dir_self.filePath ("OUT_success.csv");
 options.failCSV = dir_self.filePath ("OUT_failed.csv");
-options.extraCSVs = [(dir_self.filePath ("DK9.csv"))];
+options.extraCSVs = [dir_self.filePath ("DK9.csv"),
+	dir_self.filePath ("FBMs.csv")
+	];
 
 // This operation is undo-able. 
 ApplyDTHWorkflow(options);

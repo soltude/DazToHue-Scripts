@@ -3,6 +3,7 @@
 //include("./util.dsa");
 
 var DTH_VERBOSE = false;
+var EPSILON = .0001;
  
 function verbose(){
 	if( DTH_VERBOSE ){
@@ -11,35 +12,47 @@ function verbose(){
 }
 /**********************************************************************
 **********               */
-function setLinearInterp(oNode, startFrame, endFrame){
+function setLinearInterp(oNodes, startFrame, endFrame){
+
+	// Set default to linear interpolation off the bat, so hopefully it doesn't need to be set later
+	Scene.setDefaultKeyInterpolationType(DzProperty.Linear);
+
  	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
  	endFrame = typeof endFrame !== 'undefined' ? endFrame : 0;
 	var props = [];
-	var oObj = oNode.getObject();
-	if(oObj){
-		for(var i=0; i<oObj.getNumModifiers(); i++)
-		{
-			oMod = oObj.getModifier(i);
-			if(oMod && oMod.inherits("DzMorph"))
+	for(var x = 0; x < oNodes.length; x++)
+	{
+		var oNode = oNodes[x];
+		var oObj = oNode.getObject();
+		if(oObj){
+			for(var i=0; i<oObj.getNumModifiers(); i++)
 			{
-				oProp = oMod.getValueControl();
-				if(oProp && oProp.getNumKeys() > 1)
+				oMod = oObj.getModifier(i);
+				if(oMod && oMod.inherits("DzMorph"))
 				{
-					props.push(oProp);
+					oProp = oMod.getValueControl();
+					if(oProp && oProp.getNumKeys() > 1)
+					{
+						props.push(oProp);
+					}
 				}
 			}
-		}
-	}	
-	oNode.getPropertyList().forEach( function(oProp){
-		if (oProp.getNumKeys() > 1) {	
-			props.push(oProp)
 		}	
-	});	
-	for( var j = 0; j < oProp.getNumKeys(); j++) {
-		var keyTime = oProp.getKeyTime(j);
-		oProp.setKeyInterpolationType(j, DzFloatProperty.LINEAR_INTERP);
-		oProp.setValue(keyTime, oProp.getValue(keyTime) , DzFloatProperty.LINEAR_INTERP );
-		print("Set interp to linear for", oProp.getLabel(), j, oProp.getKeyInterpolationType(j));
+		oNode.getPropertyList().forEach( function(oProp){
+			if (oProp.getNumKeys() > 1) {	
+				props.push(oProp)
+			}	
+		});	
+	}
+	print("Props and morphs:", props.length)
+	for( var i = 0; i < props.length; i++){
+		var oProp = props[i];
+		for( var j = 0; j < oProp.getNumKeys(); j++) {
+			var keyTime = oProp.getKeyTime(j);
+			oProp.setKeyInterpolationType(j, DzFloatProperty.LINEAR_INTERP);
+			oProp.setValue(keyTime, oProp.getValue(keyTime) , DzFloatProperty.LINEAR_INTERP );
+			print("Set interp to linear for", oProp.getLabel(), j, oProp.getKeyInterpolationType(j));
+		}
 	}
 }
 
@@ -321,7 +334,9 @@ function applyKeyData(oNodeRoot, keyData){
 			oProp = getMorphPropFromNode(oNode, keyData.propName);
 		}
 		if(oProp){
+			var iKey = oProp.getNumKeys();
 			//*********** Main action - create the morph frame;
+			// if(createMorphFrameByKey(oProp, keyData.frameIdx, keyData.propValue, iKey)){
 			if(createMorphFrame(oProp, keyData.frameIdx, keyData.propValue)){
 				verbose("Successfully created morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
 				return true;
@@ -340,6 +355,42 @@ function applyKeyData(oNodeRoot, keyData){
 		print("could not find node:", keyData.nodeName, "on node:", oNodeRoot.getLabel());
 		return false
 	}
+}
+
+/** **************************************************************************/
+function createMorphFrameByKey( oProperty, iFrame, fValue, iKey){
+	if(iKey < 1){
+		//verbose("")
+		return false;
+	}
+	if( !oProperty ){
+		print("Error: Property is null.");
+		return false;	
+	}
+	if( !oProperty.inherits("DzFloatProperty")){
+		print("Error: Property is not a DzFloatProperty.");		
+		return false;	
+	}
+		verbose("Property: " + oProperty.getLabel() );
+	var timeStep = Scene.getTimeStep();
+	var tTarget = iFrame * timeStep;
+	var tPrev = iFrame * timeStep - timeStep;
+	var tNext = iFrame * timeStep + timeStep;
+	var fPrevValue = oProperty.getKeyValue(iKey-1);
+	var fNextValue = oProperty.getKeyValue(iKey-1);
+		
+	//Set the target frame to new value		
+	// if (tPrev > 0){
+		oProperty.setValue(tPrev, fPrevValue);
+		verbose("Property ", oProperty.getLabel(), " set at frame ", tPrev/timeStep, "to", fPrevValue);
+	// }
+	// if (iFrame + 1 < Scene.getAnimRange().end){
+		oProperty.setValue(tNext, fNextValue);
+		verbose("Property ", oProperty.getLabel(), " set at frame ", tNext/timeStep, " to ", fNextValue);
+	// }
+	oProperty.setValue(tTarget, fValue);
+	verbose("Set morph frame for", oProperty.getLabel(), "at frame", iFrame, "to value", fValue);
+	return true;
 }
 
 /** **************************************************************************/
@@ -452,3 +503,8 @@ function triggerAction( sActionName , oSettings)
 		return true;
 	}
 };
+
+
+function approx_eq(fValue1, fValue2){
+	return Math.abs(fValue1 - fValue2) < EPSILON;	
+}

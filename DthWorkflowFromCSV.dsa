@@ -6,8 +6,9 @@ include (dir_self.filePath ("DthWorkflow.dsa"));
 
 options.bIncludeJCM = false;
 options.bIncludeDK = false;
-options.extraCSVs = 
-	[dir_self.filePath ("ScannedFrames.csv"),//];
-	 dir_self.filePath ("FBMs.csv")];
+options.extraCSVs = [dir_self.filePath ("_TEST2.csv"), //  ];
+	// [dir_self.filePath ("ScannedFrames.csv"),  //  ];
+	dir_self.filePath ("DK9.csv"), // ];
+	dir_self.filePath ("FBMs.csv")];
 
 ApplyDTHWorkflow(options);
