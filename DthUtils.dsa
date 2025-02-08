@@ -185,6 +185,10 @@ function readPropsCSV(sFilename, frameDatas, iOffset){
 	        if(row.length > 2){
 	        	// we want absolute frame numbers, so add the offset here.
 	          	var frameNum = parseInt(row[0]) + iOffset;
+				if(!frameDatas[frameNum])
+					frameDatas[frameNum] = {keyDatas:  		[],
+											sectionName: 	row[1],
+											frameName: 		row[2] };
 	          	// take three values at a time
 	          	for(var j = 3; j + 2 < row.length; j += 3){
 	          		var keyData = { frameIdx:  frameNum,
@@ -317,8 +321,8 @@ function applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDa
 	}
 }
 
-function applyKeyData(oNodeRoot, keyData){
-	if(!oNodeRoot || !keyData.nodeName || !keyData.propName || !keyData.propValue || !keyData.frameIdx){
+function applyKeyData(oNodeRoot, keyData, overrideFrameIdx){
+	if(!oNodeRoot || !keyData.nodeName || !keyData.propName){
 		print("ERROR: cannot call applyKeyData; missing paramters. ");
 		return false;
 	}
@@ -334,10 +338,12 @@ function applyKeyData(oNodeRoot, keyData){
 			oProp = getMorphPropFromNode(oNode, keyData.propName);
 		}
 		if(oProp){
-			var iKey = oProp.getNumKeys();
+			//var iKey = oProp.getNumKeys();
 			//*********** Main action - create the morph frame;
 			// if(createMorphFrameByKey(oProp, keyData.frameIdx, keyData.propValue, iKey)){
-			if(createMorphFrame(oProp, keyData.frameIdx, keyData.propValue)){
+			var frameIdx = overrideFrameIdx == undefined ? keyData.frameIdx : overrideFrameIdx;
+
+			if(createMorphFrame(oProp, frameIdx, keyData.propValue)){
 				verbose("Successfully created morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
 				return true;
 			}
@@ -471,6 +477,15 @@ function getNodeRoot(oNode){
 	}
 	return oNode;
 }
+
+function getSceneNameNoExt(){
+	var regexFilename = RegExp("\\w*(?=\\.)");
+	var aMatches = regexFilename.exec(Scene.getFilename());
+	if (aMatches.length > 0)
+		return aMatches[0];
+	return undefined;
+}
+
 
 /*********************************************************************/
 // String : A function for triggering an action

@@ -1,0 +1,214 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+// DthUtils.dsa must exist in the same folder as this script
+var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
+include (dir_self.filePath ("DthUtils.dsa"));
+include (dir_self.filePath ("DthOptions.dsa"));
+include (dir_self.filePath ("ScanKeyFrames.dsa"));
+
+
+options.extraCSVs = [dir_self.filePath ("Genesis9g_v3.csv")  ];
+options.frameStart = 797;
+options.frameEnd = 839;
+options.intermediateFolder = "C:\\Users\\soltu\\Documents\\DAZ 3D\\Bridges\\Daz To Maya\\Exports\\FIG\\FIG0";
+options.destinationOuter = "E:\\DTH\\DazToHue1.7\\characters";
+
+/*********************************************************************************
+ * Begin Tutorial Script
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */ 
+
+
+
+function applyFrameData(oNodeRoot, frameData, idx){
+	print("  applying frame:", idx);
+	var undoKeyDatas = [];
+	if(frameData){
+		var keyDatas = frameData.keyDatas;
+		if(keyDatas){
+			for (var j = 0; j < keyDatas.length; j++)
+			{
+				var keyData = keyDatas[j];
+				if(!keyData.propName)
+					continue;
+				keyData.frameIdx = 0;
+				var undoKeyData = applyKeyData2(oNodeRoot, keyData, 0);
+				if(undoKeyData){
+					print("Applied frame", idx);	
+					undoKeyDatas.push(undoKeyData);
+				}
+				else
+					print("failed to apply frame", idx);	
+			}
+		}
+	}
+	var undoFrameData = {};
+	undoFrameData.keyDatas = undoKeyDatas;
+	return undoFrameData;
+}
+
+function applyKeyData2(oNodeRoot, keyData, overrideFrameIdx){
+	if(!oNodeRoot || !keyData.nodeName || !keyData.propName){
+		print("ERROR: cannot call applyKeyData; missing paramters. ");
+		return false;
+	}
+	verbose("Creating morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
+	var oNode;
+	if(oNodeRoot.getName() == keyData.nodeName)
+		oNode = oNodeRoot;
+	else
+		oNode = oNodeRoot.findNodeChild(keyData.nodeName, true);
+	if(oNode){
+		var oProp = oNode.findProperty(keyData.propName);
+		if(!oProp){
+			oProp = getMorphPropFromNode(oNode, keyData.propName);
+		}
+		if(oProp){
+			var undoKeyData = {};
+			undoKeyData.frameIdx = keyData.frameIdx;
+			undoKeyData.propName = keyData.propName;
+			undoKeyData.nodeName = keyData.nodeName;
+			undoKeyData.propValue = oProp.getDefaultValue();
+
+			oProp.setValue(keyData.propValue);
+
+			return undoKeyData;	
+		} else {
+			print("property ", keyData.propName, " not found on node", oNode.getLabel());
+			return false;
+		}
+	} else {
+		print("could not find node:", keyData.nodeName, "on node:", oNodeRoot.getLabel());
+		return false;
+	}
+}
+
+
+function exportFBMs(options){
+
+	var wDlg = new DzBasicDialog();
+	var oDlgWgt = wDlg.getWidget();
+
+	var filename = options.extraCSVs[0];
+	if(!filename){
+		print("No file for FBMs");
+		return false; }
+
+	var oActionMgr = MainWindow.getActionMgr();
+	if(!oActionMgr) { print("no oActionMgr");
+						return false; }
+
+	var oAction = oActionMgr.findAction("DzMayaAction");
+	if(!oAction) { print("no DzMayaAction");
+					return false; }
+	if(!oAction.enabled) { print("DzMayaAction not enabled");
+							return false; }
+
+	var sceneName = getSceneNameNoExt(); 
+	if(!sceneName) { print("no sceneName");
+					return false; }
+
+	var oInterDir = DzDir(options.intermediateFolder);
+	if(!oInterDir.exists()) { print("no oInterDir");
+					return false; }
+	var destPath = options.destinationOuter + "//" + sceneName;
+	print("Dest path ", destPath );
+	var oDestDir = DzDir(destPath);
+	if(!oDestDir.exists()) { 
+		print("no oDestDir");
+		oDestDir.mkpath(destPath);
+		if(!oDestDir.exists()) { 
+			print("  unable to create oDestDir");
+			 return false;
+		}
+		print("created path ", destPath );
+	}
+
+	var sourceFilename = oInterDir.absoluteFilePath("B_FIG.fbx");
+	var outputDir = options.intermediateFolder + sceneName + "\\";
+
+	var oNode = Scene.getPrimarySelection();
+	var oNodeRoot = getNodeRoot(oNode);
+	if(!oNodeRoot || !oNodeRoot.inherits("DzNode")){
+		print("Error: Node `Genesis 9` not found in scene");
+		return false; }
+
+	beginUndo();	
+
+	Scene.setTime(0);
+
+	var frameDatas = CreateFrameDatas(options, 0);
+	//	readPropsCSV(filename, frameDatas);
+	print(frameDatas[800].keyDatas[0].propName);
+	for (var i = options.frameStart; i<=options.frameEnd; i++){
+		var frameData = frameDatas[i];
+		var frameName = frameData.frameName;
+		if(!frameName || frameName.length == 0){ print("No frame name found for FBM", i, "CSV line number:", frameData.frameIdx);
+			continue;	}
+
+		// Apply all FBM morphs to frame zero, gets the frameData to undo it
+		var undoFrameData = applyFrameData(oNodeRoot, frameData, i);
+
+		//  Launch the DzMayaDialog
+		print("triggering DzMayaAction for", frameData.frameName);
+		oAction.trigger();
+
+		//  Copy the file we created to the name indicated on the frame
+		if(oInterDir.exists("B_FIG.fbx")){
+			if(oInterDir.move("B_FIG.fbx", oDestDir.absoluteFilePath(frameName + ".fbx"))){
+				print("Moved B_FIG.fbx to", oDestDir.absoluteFilePath(frameName + ".fbx"));
+			} else {
+				print("Failed to move B_FIG.fbx to", oDestDir.absoluteFilePath(frameName + ".fbx"));
+			}
+		}
+		else {
+			print("Could not find B_FIG.fbx");
+		}
+
+		//  Modal dialog with option to cancel the rest of the frames
+		if(!wDlg.exec())
+			return;
+
+		//  Undo the properties we changed. 
+		applyFrameData(oNodeRoot, undoFrameData, i);
+	}
+
+
+	acceptUndo("Apply FBM morph to frame 0");
+}
+
+exportFBMs(options);
+
+
+
+/*
+	var destFilename = outputDir + frameName + ".fbx";
+	var cmdBuffer =  "copy " + sourceFilename + " " + destFilename;
+	print("sourceFilename: ", sourceFilename);
+	print("destFilename: ", destFilename);
+	var copyProcess = DzProcess(["copy", sourceFilename, destFilename]);
+	//var copyProcess = DzProcess("cmd.exe");
+	copyProcess.launch(cmdBuffer);
+
+	print(" Copy stdout:", copyProcess.readStdout());
+	print(" Copy stderr:", copyProcess.readStderr());
+*/
+
+function CreateFrameDatas(options, startFrame){
+	frameDatas = [];
+	var iOffset = startFrame;
+	print("Loading CSVs starting at frame", iOffset);
+	extraCSVs = options.extraCSVs;
+	if(extraCSVs){
+		for(var i = 0; i < extraCSVs.length; i++){
+			sFilename = extraCSVs[i];
+			print("attempting to read CSV file at:", sFilename);
+			// frameDatas is modified
+			readPropsCSV(sFilename, frameDatas, iOffset);
+			iOffset = frameDatas.length;
+			print(" - New frame count:", iOffset);	
+		}
+	}
+	return frameDatas;
+
+}
+
