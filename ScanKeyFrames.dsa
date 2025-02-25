@@ -20,6 +20,10 @@ function getProps(oNode)
 
 var timeStep = Scene.getTimeStep().valueOf();
 
+/** sPropName - optional, used with morphs where the oProp doesn't have the correct name
+ * 
+ * */
+
 
 
 function addKeysFromProp(frameDatas, oNode, oProp, sPropName){
@@ -28,21 +32,56 @@ function addKeysFromProp(frameDatas, oNode, oProp, sPropName){
 	// Don't get keys that only exist on the first frame 
 	if (oProp && oProp.inherits("DzFloatProperty") && oProp.getNumKeys() > 1) 
 	{	
+		var origValue = oProp.getRawValue(0);
+		if(oProp.isAlias()){
+			print ("property is alias, returning false.");
+			return false;
+		}
 		var keyTimes = [];
-		for(j = 0; j < oProp.getNumKeys(); j++) 
+		var numKeys = oProp.getNumKeys();j
+		// For each key on this oProp
+		for(j = 0; j < numKeys; j++) 
 		{
-			var keyTime = oProp.getKeyTime(j);
+			var keyTime = oProp.getKeyTime(j).valueOf();
+			var propValue = oProp.getRawValue(keyTime);
+			if (!approx_eq(propValue, oProp.getValue(keyTime)))
+				print("><- prop value diff from raw value", oProp.name, "key:", j, "frame:", keyTime/timeStep);
 			// only record a key if its value is different from the reference pose.
-			if(oProp.getValue(keyTime) != oProp.getValue(0))
+			if( !approx_eq(propValue, origValue) )
 			{
-				var frameIdx = keyTime.valueOf() / timeStep;
+				var frameIdx = keyTime / timeStep;
 				var keyData = { frameIdx:  frameIdx,
 								nodeName:  oNode.objectName,
 								propName:  sPropName || oProp.name, // propPath:   getAncestors(childNode),
-								propValue: oProp.getValue(keyTime) };
+								propValue: propValue };
 				keyTimes.push(frameIdx);
 				// verbose("  Adding framedata", keyData.propName, "at frame", frameIdx);
 				addFrameData(frameDatas, keyData);
+
+				//handle additive morphs: we lerp the value at each intermediate frame and put a key there
+				var nextTime = oProp.getKeyTime(j+1).valueOf(); 
+				var nextValue = oProp.getRawValue(nextTime);
+				var timeDiff = (nextTime-keyTime);
+				if( j > 0 && j < numKeys -1				// - not the first or last key 
+					&& !approx_eq(nextValue, origValue) // - next key is not original value
+					&& nextTime - keyTime > timeStep 	// - more than one frame between keys
+					&& timeDiff/timeStep < 20)			// - avoid noise
+				{
+					for(var t = keyTime + timeStep; t < nextTime; t += timeStep ){
+						frameIdx = t / timeStep;
+						keyData = { frameIdx:  frameIdx,
+									nodeName:  oNode.objectName,
+									propName:  sPropName || oProp.name, // propPath:   getAncestors(childNode),
+									propValue: ((propValue * (t - keyTime) / timeDiff)
+											   + (nextValue * (nextTime - t) / timeDiff))};
+						print(" * adding lerp key at frame", t/timeStep,":", keyData.propName, keyData.propValue);
+						addFrameData(frameDatas, keyData);
+					}
+				
+				}
+			}
+			else{
+				print("propValue ~= origValue", sPropName || oProp.name, origValue, propValue);
 			}
 		}
 		print(childNode.objectName, oProp.getLabel(), keyTimes);
@@ -54,27 +93,55 @@ function addKeysFromProp(frameDatas, oNode, oProp, sPropName){
 }
 
 
-function scanNodesForFrameDatas(aNodes, frameDatas){
+function addKeysFromPropFigure(frameDatas, oNode, oProp, sPropName){
+	var j;
+	if (oProp && oProp.inherits("DzFloatProperty") ) 
+	{	
+		if(oProp.isAlias()){
+			//ve ("property is alias, returning false.");
+			return false;
+		}
+		if(!oProp.currentValueIsDefaultValue()){
+			print(oProp.name, oProp.currentValueIsDefaultValue());
+			var	keyData = { frameIdx:  0,
+							nodeName:  oNode.objectName,
+							propName:  sPropName || oProp.name, // propPath:   getAncestors(childNode),
+							propValue: oProp.getValue(0)};
+			print("  Adding framedata", keyData.propName, "at frame", 0);
+			addFrameData(frameDatas, keyData);
+		}
+	}
+	else{
+		// print("WARNING: oProp is not a DzFloatProperty or has only one key:", oProp.getLabel());
+	}
+	//print("Property",oProp.objectName,"has one or fewer keys, not including");
+}
+
+
+
+
+function scanNodesForFrameDatas(aNodes, frameDatas, fPropFunc){
+	fPropFunc = fPropFunc || addKeysFromProp;
 	var frameDatas = frameDatas || [];
 	if(aNodes.length > 0){
 		var oNodeRoot = getNodeRoot(aNodes[0]);
 		if(oNodeRoot && oNodeRoot.inherits("DzNode"))
 		{
-			scanNodeForProps(oNodeRoot, frameDatas);
+			scanNodeForProps(oNodeRoot, frameDatas, fPropFunc);
 		}
 	}
 	for (var i = 0; i < aNodes.length; i++)
 	{
 		var oNode = aNodes[i];
 		if(oNode){
-			print("scanning node", oNode.name, "for properties and morphs");
-			scanNodeForMorphs(oNode, frameDatas);
+			verbose("scanning node", oNode.name, "for properties and morphs");
+			scanNodeForMorphs(oNode, frameDatas, fPropFunc);
 		}
 	}
 	return frameDatas;
 }
 
-function scanNodeForProps(oNode, frameDatas){
+function scanNodeForProps(oNode, frameDatas, fPropFunc){
 	var frameDatas = frameDatas || [];
 	if(oNode && oNode.inherits("DzNode"))
 	{	
@@ -92,7 +159,7 @@ function scanNodeForProps(oNode, frameDatas){
 				childNode.getPropertyList().forEach( function(oProp)
 				{
 					// verbose("  Adding key from prop:", oProp.name);
-					addKeysFromProp(frameDatas, childNode, oProp);
+					fPropFunc(frameDatas, childNode, oProp);
 				});
 			}
 		}
@@ -104,7 +171,7 @@ function scanNodeForProps(oNode, frameDatas){
 	return frameDatas;
 }
 
-function scanNodeForMorphs(oNode, frameDatas){
+function scanNodeForMorphs(oNode, frameDatas, fPropFunc){
 	var frameDatas = frameDatas || [];
 	if(oNode && oNode.inherits("DzNode"))
 	{	
@@ -119,8 +186,8 @@ function scanNodeForMorphs(oNode, frameDatas){
 					oProp = oMod.getValueControl();
 					if(oProp && oProp.getNumKeys() > 1)
 					{
-						print("modifier:", oMod.name, oMod.inherits("DzMorph"));
-						addKeysFromProp(frameDatas, oNode, oProp, oMod.name);
+						verbose("modifier:", oMod.name, oMod.inherits("DzMorph"));
+						fPropFunc(frameDatas, oNode, oProp, oMod.name);
 					}
 				}
 				
@@ -147,24 +214,6 @@ function getAncestors(oNode){
 }
 
 
-
-function printFrameDatas(frameDatas){
-	for (i = 1; i < frameDatas.length; i++){
-		var frameData = frameDatas[i];
-		if(frameData !== undefined){	
-			print("Frame", i, "length:", frameData.length);	
-			if (frameData.length > 30) //A regular frame shouldn't have anywhere near this
-				continue;
-			for (j = 0; j < frameData.length; j++)
-			{
-				var keyData = frameData[j];
-				if(keyData.propValue != 0)
-					print("  ", keyData.nodeName, keyData.propName, keyData.propValue);
-			}
-		}
-	}
-}
-
 function getNodeParents(oNode){
 	parents = [];
 	if(oNode && oNode.inherits("DzNode"))
@@ -179,3 +228,19 @@ function getNodeParents(oNode){
 }
 
 
+// function printFrameDatas(frameDatas){
+// 	for (i = 1; i < frameDatas.length; i++){
+// 		var frameData = frameDatas[i];
+// 		if(frameData !== undefined){	
+// 			print("Frame", i, "length:", frameData.length);	
+// 			if (frameData.length > 30) //A regular frame shouldn't have anywhere near this
+// 				continue;
+// 			for (j = 0; j < frameData.length; j++)
+// 			{
+// 				var keyData = frameData[j];
+// 				if(keyData.propValue != 0)
+// 					print("  ", keyData.nodeName, keyData.propName, keyData.propValue);
+// 			}
+// 		}
+// 	}
+// }

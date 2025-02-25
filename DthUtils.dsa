@@ -295,14 +295,17 @@ function createMorphFrames( oNode, morphConfigs, iStartFrame){
 }
 
 
-function applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDatas)
+function applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDatas, startFrame)
 {
+
 	verbose("! Applying frameDatas");
+	startFrame = startFrame || 0;
+
 	var successFrameDatas = successFrameDatas || [];
 	var failedFrameDatas = failedFrameDatas || [];
 	if(Scene.getAnimRange().end < frameDatas.length)
 		setTotalFrames(frameDatas.length);
-	for(var i = 0; i < frameDatas.length; i++){
+	for(var i = startFrame; i < frameDatas.length; i++){
 		verbose("  applying frame:", i);
 		var frameData = frameDatas[i];
 		if(frameData){
