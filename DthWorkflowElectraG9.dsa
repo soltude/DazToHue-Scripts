@@ -1,0 +1,27 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+// DTH Workflow for Electra G9 with FBM morphs
+// Uses soltude/DazToHue-Scripts framework
+
+var dir_self = new DzDir(new DzFileInfo(getScriptFileName()).path());
+include(dir_self.filePath("DthWorkflow.dsa"));
+
+// Override default options for Electra G9 workflow
+options.bIncludeJCM = true;
+options.bIncludeFAC = true;
+options.bIncludeDK = false;
+options.bIncludeGP = true;   // Golden Palace ROM (~103 frames)
+options.bDQS = true;         // DQS mode = 328 base frames
+
+// Add FBM morphs CSV
+options.extraCSVs = [
+    dir_self.filePath("ElectraG9_FBMs.csv")
+];
+
+// Preserve Electra's breast position after ROM loading
+options.preserveMorphs = [
+    { name: "body_ctrl_BreastsUp-Down", keepValue: 1 }
+];
+
+// Run the workflow
+ApplyDTHWorkflow(options);

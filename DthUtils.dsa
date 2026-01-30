@@ -20,10 +20,18 @@ function setLinearInterp(oNodes, startFrame, endFrame){
  	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
  	endFrame = typeof endFrame !== 'undefined' ? endFrame : 0;
 	var props = [];
+
+	// Properties to skip (transforms should never be touched)
+	var skipProps = ["Scale", "XScale", "YScale", "ZScale",
+					 "XRotate", "YRotate", "ZRotate",
+					 "XTranslate", "YTranslate", "ZTranslate",
+					 "General Scale", "X Scale", "Y Scale", "Z Scale"];
+
 	for(var x = 0; x < oNodes.length; x++)
 	{
 		var oNode = oNodes[x];
 		var oObj = oNode.getObject();
+		// Only process morph modifiers, NOT node properties (which include Scale/Transform)
 		if(oObj){
 			for(var i=0; i<oObj.getNumModifiers(); i++)
 			{
@@ -37,21 +45,15 @@ function setLinearInterp(oNodes, startFrame, endFrame){
 					}
 				}
 			}
-		}	
-		oNode.getPropertyList().forEach( function(oProp){
-			if (oProp.getNumKeys() > 1) {	
-				props.push(oProp)
-			}	
-		});	
+		}
+		// Skip node properties entirely - they include Scale/Transform which should never be modified
 	}
-	print("Props and morphs:", props.length)
+	print("Morph props to set linear interp:", props.length)
 	for( var i = 0; i < props.length; i++){
 		var oProp = props[i];
 		for( var j = 0; j < oProp.getNumKeys(); j++) {
-			var keyTime = oProp.getKeyTime(j);
+			// Only set interpolation type - do NOT call setValue as it can modify values
 			oProp.setKeyInterpolationType(j, DzFloatProperty.LINEAR_INTERP);
-			oProp.setValue(keyTime, oProp.getValue(keyTime) , DzFloatProperty.LINEAR_INTERP );
-			print("Set interp to linear for", oProp.getLabel(), j, oProp.getKeyInterpolationType(j));
 		}
 	}
 }
@@ -194,7 +196,7 @@ function readPropsCSV(sFilename, frameDatas, iOffset){
 	          		var keyData = { frameIdx:  frameNum,
 									nodeName:  row[j],
 									propName:  row[j+1],
-									propValue: row[j+2] };
+									propValue: parseFloat(row[j+2]) };
 					addFrameData(frameDatas, keyData);
 					verbose("add frame data. frame:",frameNum, "prop:", row[j+1]);
 	          	}
@@ -295,6 +297,60 @@ function createMorphFrames( oNode, morphConfigs, iStartFrame){
 }
 
 
+// Reset all morphs in frameDatas to 0 at a specific frame (typically frame 0)
+// This preserves the base state and prevents interpolation issues
+function resetFrameDatasAtFrame(oNodeRoot, frameDatas, resetFrame){
+	resetFrame = resetFrame || 0;
+	var timeStep = Scene.getTimeStep();
+	var processedProps = {}; // Track which props we've already reset
+
+	for(var i = 0; i < frameDatas.length; i++){
+		var frameData = frameDatas[i];
+		if(frameData && frameData.keyDatas){
+			for(var j = 0; j < frameData.keyDatas.length; j++){
+				var keyData = frameData.keyDatas[j];
+				if(!keyData.propName || processedProps[keyData.propName]) continue;
+
+				// Find the node
+				var oNode;
+				if(oNodeRoot.getName() == keyData.nodeName || oNodeRoot.getLabel() == keyData.nodeName)
+					oNode = oNodeRoot;
+				else
+					oNode = oNodeRoot.findNodeChild(keyData.nodeName, true);
+				if(!oNode)
+					oNode = oNodeRoot.findNodeChildByLabel(keyData.nodeName, true);
+
+				if(oNode){
+					// Find the property (same logic as applyKeyData)
+					var oProp = getMorphPropFromNode(oNode, keyData.propName);
+					if(!oProp){
+						var oObj = oNode.getObject();
+						if(oObj){
+							for(var m = 0; m < oObj.getNumModifiers(); m++){
+								var mod = oObj.getModifier(m);
+								if(mod.getLabel() === keyData.propName || mod.getName() === keyData.propName){
+									if(mod.getValueChannel) oProp = mod.getValueChannel(0);
+									if(!oProp && mod.getValueControl) oProp = mod.getValueControl();
+									if(oProp) break;
+								}
+							}
+						}
+					}
+
+					if(oProp){
+						// Set to 0 at reset frame
+						oProp.setValue(resetFrame * timeStep, 0);
+						processedProps[keyData.propName] = true;
+						verbose("Reset", keyData.propName, "to 0 at frame", resetFrame);
+					}
+				}
+			}
+		}
+	}
+	print("Reset", Object.keys(processedProps).length, "morphs to 0 at frame", resetFrame);
+}
+
+
 function applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDatas, startFrame)
 {
 
@@ -303,7 +359,7 @@ function applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDa
 
 	var successFrameDatas = successFrameDatas || [];
 	var failedFrameDatas = failedFrameDatas || [];
-	if(Scene.getAnimRange().end < frameDatas.length)
+	if(Scene.getAnimRange().end / Scene.getTimeStep() < frameDatas.length)
 		setTotalFrames(frameDatas.length);
 	for(var i = startFrame; i < frameDatas.length; i++){
 		verbose("  applying frame:", i);
@@ -329,17 +385,61 @@ function applyKeyData(oNodeRoot, keyData, overrideFrameIdx){
 		print("ERROR: cannot call applyKeyData; missing paramters. ");
 		return false;
 	}
-	verbose("Creating morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
+	print("Creating morph frame on", keyData.nodeName, "prop:", keyData.propName, "value:", keyData.propValue);
 	var oNode;
-	if(oNodeRoot.getName() == keyData.nodeName)
+	// Try matching by name or label
+	if(oNodeRoot.getName() == keyData.nodeName || oNodeRoot.getLabel() == keyData.nodeName)
 		oNode = oNodeRoot;
 	else
 		oNode = oNodeRoot.findNodeChild(keyData.nodeName, true);
+	if(!oNode)
+		oNode = oNodeRoot.findNodeChildByLabel(keyData.nodeName, true);
 	if(oNode){
-		var oProp = oNode.findProperty(keyData.propName);
-		if(!oProp){
-			oProp = getMorphPropFromNode(oNode, keyData.propName);
+		print("  Node found:", oNode.getName(), "/ Label:", oNode.getLabel());
+		var oProp = null;
+
+		// FIRST: Try modifier lookup (most reliable for morphs)
+		oProp = getMorphPropFromNode(oNode, keyData.propName);
+		if(oProp){
+			print("  Found via getMorphPropFromNode");
 		}
+
+		// SECOND: Loop through all modifiers and check by label/name
+		if(!oProp){
+			var oObj = oNode.getObject();
+			if(oObj){
+				for(var m = 0; m < oObj.getNumModifiers(); m++){
+					var mod = oObj.getModifier(m);
+					if(mod.getLabel() === keyData.propName || mod.getName() === keyData.propName){
+						// Try different methods to get the value property
+						if(mod.getValueChannel){
+							oProp = mod.getValueChannel(0);
+						}
+						if(!oProp && mod.getValueControl){
+							oProp = mod.getValueControl();
+						}
+						if(!oProp && mod.getChannel){
+							oProp = mod.getChannel(0);
+						}
+						if(oProp){
+							print("  Found via modifier loop by label/name:", keyData.propName);
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		// LAST RESORT: Try node property lookup (for non-morph properties like poses)
+		if(!oProp){
+			oProp = oNode.findProperty(keyData.propName);
+			if(oProp) print("  Found via findProperty (fallback)");
+		}
+		if(!oProp){
+			oProp = oNode.findPropertyByLabel(keyData.propName);
+			if(oProp) print("  Found via findPropertyByLabel (fallback)");
+		}
+
 		if(oProp){
 			//var iKey = oProp.getNumKeys();
 			//*********** Main action - create the morph frame;
@@ -524,5 +624,42 @@ function triggerAction( sActionName , oSettings)
 
 
 function approx_eq(fValue1, fValue2){
-	return Math.abs(fValue1 - fValue2) < EPSILON;	
+	return Math.abs(fValue1 - fValue2) < EPSILON;
+}
+
+// Restores morphs specified in options.preserveMorphs to their keepValue
+// preserveMorphs format: [{ name: "body_ctrl_BreastsUp-Down", keepValue: 1 }, ...]
+function restorePreservedMorphs(oNodeRoot, preserveMorphs) {
+    if (!preserveMorphs || preserveMorphs.length === 0) {
+        return;
+    }
+
+    for (var i = 0; i < preserveMorphs.length; i++) {
+        var config = preserveMorphs[i];
+        if (!config.name) continue;
+
+        var oProp = oNodeRoot.findProperty(config.name);
+        if (!oProp) {
+            oProp = oNodeRoot.findPropertyByLabel(config.name);
+        }
+        if (!oProp) {
+            oProp = getMorphPropFromNode(oNodeRoot, config.name);
+        }
+
+        if (oProp) {
+            // Set all keyframes to keepValue (flattens the animation to constant)
+            var numKeys = oProp.getNumKeys();
+            if (numKeys > 0) {
+                for (var k = 0; k < numKeys; k++) {
+                    var keyTime = oProp.getKeyTime(k);
+                    oProp.setValue(keyTime, config.keepValue);
+                }
+            } else {
+                oProp.setValue(config.keepValue);
+            }
+            print("Restored preserved morph:", config.name, "to", config.keepValue);
+        } else {
+            print("WARNING: Could not find preserved morph:", config.name);
+        }
+    }
 }

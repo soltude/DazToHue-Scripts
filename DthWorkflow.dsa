@@ -32,6 +32,10 @@ function ApplyDTHWorkflow(options){
 	if(!oNodeDk9 && options.bIncludeDK){
 		print("Error: Node `DicktatorG9` not found in scene");
 		return false; }
+	var oNodeGP = oNodeRoot.findNodeChildByLabel("GoldenPalace_G9");
+	if(!oNodeGP && options.bIncludeGP){
+		print("Error: Node `GoldenPalace_G9` not found in scene");
+		return false; }
 
 	/**       *****************************************************/
 	print("Applying initial values... ");
@@ -43,6 +47,9 @@ function ApplyDTHWorkflow(options){
 		print("Applying default ROMs...");
 		if(!ApplyDefaultROMs(options, oNodeRoot, oNodeMouth))
 			return false;
+
+		// Restore any morphs that should be preserved after ROM loading
+		restorePreservedMorphs(oNodeRoot, options.preserveMorphs);
 	}
 
 	/**       *****************************************************/
@@ -54,6 +61,15 @@ function ApplyDTHWorkflow(options){
 		ApplyDK9(options, oNodeRoot, oNodeDk9, 617);
 	}
 
+	/**       *****************************************************/
+	if( options["bIncludeGP"] )
+	{
+		print("Applying GP9 ROMs...");
+		var startFrame = Scene.getAnimRange().end / Scene.getTimeStep();
+		if(!ApplyGP9(options, oNodeRoot, oNodeGP, startFrame))
+			return false;
+	}
+
 	/** ****************************************************************/
 	print("Creating FrameDatas from extraCSVs");
 	var startFrame = Scene.getAnimRange().end / Scene.getTimeStep();
@@ -62,6 +78,11 @@ function ApplyDTHWorkflow(options){
 	var frameDatas = CreateFrameDatas(options, startFrame);
 	print("Framedatas length:", frameDatas.length);
 	printCSV(frameDatas, (dir_self.filePath ("OUT.csv")));
+
+	/** ****************************************************************/
+	// IMPORTANT: Set all FBM morphs to 0 at frame 0 to preserve base state
+	print("Setting FBM morphs to 0 at frame 0 to preserve base state");
+	resetFrameDatasAtFrame(oNodeRoot, frameDatas, 0);
 
 	/** ****************************************************************/
 	print("Applying FrameDatas from extraCSVs");
@@ -80,9 +101,12 @@ function ApplyDTHWorkflow(options){
 
 	/** ****************************************************************/
 	print("Setting keys to linear interpolation");
-	setLinearInterp(oNodeRoot);
+	setLinearInterp([oNodeRoot]);
 
-	acceptUndo("DK9 Workflow");
+	// Reset timeline to frame 0 so character appears in base state
+	Scene.setFrame(0);
+
+	acceptUndo("DTH Workflow");
 }
 
 
@@ -121,15 +145,16 @@ function ApplyDefaultROMs(options, oNodeRoot, oNodeMouth){
 	var ROMs = getRomPaths(options);
 	var sJcmROM = ROMs[0];
 	var sMouthROM = ROMs[1];
+	var iRomFrames = options["bDQS"] ? 328 : 617;
 
 	print("Loading JCM ROM: ", sJcmROM);
-	setTotalFrames(617);
+	setTotalFrames(iRomFrames);
 	if( loadPreset(sJcmROM, oNodeRoot) ){
 		print("Successfully loaded pose preset.");
 
 		if( options["bIncludeFAC"] ){
 			print("Loading Mouth ROM: ", sMouthROM);
-			setTotalFrames(617);
+			setTotalFrames(iRomFrames);
 			if(loadPreset(sMouthROM,  oNodeMouth) ){
 				print("Successfully loaded pose preset.");
 				return true;
@@ -156,14 +181,39 @@ function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
 		return false;
 	}
 
-	var aFenceFrames = options["aDK9FenceOffsets"].map(function(x){ return x +  startFrame; }) 
+	var aFenceFrames = options["aDK9FenceOffsets"].map(function(x){ return x +  startFrame; })
 	print("Setting fence poses for", oNodeDk9.objectName, "from frame", 0, "to", aFenceFrames);
-	//setFencePoses(oNodeDk9, 0, [617, 650, 663, 664, 666, 669]); 
-	//setFencePoses(oNodeDk9, 0, aFenceFrames); 
+	//setFencePoses(oNodeDk9, 0, [617, 650, 663, 664, 666, 669]);
+	//setFencePoses(oNodeDk9, 0, aFenceFrames);
 	setFencePoses(oNodeDk9, 0, [startFrame]);
 
 	print("Setting keys to linear interpolation");
-	setLinearInterp(oNodeDk9);
+	setLinearInterp([oNodeDk9]);
+}
+
+
+function ApplyGP9(options, oNodeRoot, oNodeGP, startFrame){
+	// GP ROM has ~103 frames (offsets go to 102)
+	var gpFrameCount = 103;
+	var totalFrames = startFrame + gpFrameCount;
+
+	// Set total frames before loading preset
+	setTotalFrames(totalFrames);
+
+	print("Loading ROM: ", ROM_GP9, "at frame", startFrame);
+	if( !loadPreset(ROM_GP9, oNodeGP, startFrame) ){
+		print("Failed loading ROM:", ROM_GP9);
+		return false;
+	}
+
+	var aFenceFrames = options["aGPFenceOffsets"].map(function(x){ return x + startFrame; });
+	print("Setting fence poses for", oNodeGP.objectName, "from frame", 0, "to", aFenceFrames);
+	setFencePoses(oNodeGP, 0, aFenceFrames);
+
+	print("Setting keys to linear interpolation");
+	setLinearInterp([oNodeGP]);
+
+	return true;
 }
 
 
