@@ -213,6 +213,142 @@ function readPropsCSV(sFilename, frameDatas, iOffset){
 	return frameDatas;
 }
 
+// Reads frame data from JSON file format
+// JSON format:
+// {
+//   "meta": { "version": "1.0", "description": "..." },
+//   "frames": [
+//     {
+//       "frame": 100,  // Relative frame offset (added to iOffset)
+//       "section": "GP9",
+//       "name": "Anus_Open",
+//       "morphs": [
+//         { "node": "GoldenPalace_G9", "prop": "GP9_Anus_Open", "value": 1.0 },
+//         { "node": "GoldenPalace_G9", "prop": "GP9_Anus_Depth", "value": 0.5, "base": 0.2 }
+//       ]
+//     }
+//   ]
+// }
+function readFrameDataJSON(sFilename, frameDatas, iOffset){
+	frameDatas = frameDatas || [];
+	iOffset = iOffset || 0;
+
+	var oFile = new DzFile(sFilename);
+	if (!oFile.open(oFile.ReadOnly)) {
+		print("ERROR: could not find or open file:", sFilename);
+		return frameDatas;
+	}
+
+	var sContent = oFile.read();
+	oFile.close();
+
+	var jsonData;
+	try {
+		jsonData = JSON.parse(sContent);
+	} catch (e) {
+		print("ERROR: failed to parse JSON from:", sFilename, "-", e);
+		return frameDatas;
+	}
+
+	if (!jsonData.frames || !Array.isArray(jsonData.frames)) {
+		print("ERROR: JSON file missing 'frames' array:", sFilename);
+		return frameDatas;
+	}
+
+	// Handle resetGPBeforeApplying - reset GP morphs at FBM start to prevent leakage
+	if (jsonData.meta && jsonData.meta.resetGPBeforeApplying === true) {
+		var oFileInfo = new DzFileInfo(sFilename);
+		var gpJsonPath = oFileInfo.path() + "/GP9_ArtDirection.json";
+
+		var gpFile = new DzFile(gpJsonPath);
+		if (gpFile.open(gpFile.ReadOnly)) {
+			var gpContent = gpFile.read();
+			gpFile.close();
+
+			try {
+				var gpData = JSON.parse(gpContent);
+				if (gpData.frames && gpData.frames.length > 0) {
+					// Find the last frame (highest frame number)
+					var lastFrame = null;
+					var maxFrameNum = -1;
+					for (var g = 0; g < gpData.frames.length; g++) {
+						var gf = gpData.frames[g];
+						if (parseInt(gf.frame) > maxFrameNum) {
+							maxFrameNum = parseInt(gf.frame);
+							lastFrame = gf;
+						}
+					}
+
+					if (lastFrame && lastFrame.morphs && lastFrame.morphs.length > 0) {
+						// Find minimum frame in this FBM JSON for reset point
+						var minFrame = Number.MAX_VALUE;
+						for (var f = 0; f < jsonData.frames.length; f++) {
+							var fn = parseInt(jsonData.frames[f].frame);
+							if (fn < minFrame) minFrame = fn;
+						}
+						var firstFrameNum = minFrame + iOffset;
+
+						// Add reset keyDatas for each morph from GP last frame
+						// Use noSawtooth flag to prevent overwriting the previous frame's value
+						for (var m = 0; m < lastFrame.morphs.length; m++) {
+							var gpMorph = lastFrame.morphs[m];
+							var keyData = {
+								frameIdx: firstFrameNum,
+								nodeName: gpMorph.node,
+								propName: gpMorph.prop,
+								propValue: 0,
+								baseValue: 0,
+								noSawtooth: true  // Don't use sawtooth pattern for reset
+							};
+							addFrameData(frameDatas, keyData);
+							verbose("Reset GP morph before applying:", gpMorph.prop, "at frame", firstFrameNum);
+						}
+						print("Reset", lastFrame.morphs.length, "GP morphs from frame", lastFrame.name, "at FBM start frame", firstFrameNum);
+					} else {
+						print("WARNING: GP9 last frame has no morphs defined - nothing to reset");
+					}
+				}
+			} catch (e) {
+				print("ERROR: Failed to parse GP9_ArtDirection.json:", e);
+			}
+		} else {
+			print("WARNING: Could not open GP9_ArtDirection.json at:", gpJsonPath);
+		}
+	}
+
+	var frameCount = 0;
+	for (var i = 0; i < jsonData.frames.length; i++) {
+		var frameEntry = jsonData.frames[i];
+		var frameNum = parseInt(frameEntry.frame) + iOffset;
+
+		if (!frameDatas[frameNum]) {
+			frameDatas[frameNum] = {
+				keyDatas: [],
+				sectionName: frameEntry.section || "",
+				frameName: frameEntry.name || ""
+			};
+		}
+
+		if (frameEntry.morphs && Array.isArray(frameEntry.morphs)) {
+			for (var j = 0; j < frameEntry.morphs.length; j++) {
+				var morph = frameEntry.morphs[j];
+				var keyData = {
+					frameIdx: frameNum,
+					nodeName: morph.node,
+					propName: morph.prop,
+					propValue: parseFloat(morph.value),
+					baseValue: (morph.base !== undefined) ? parseFloat(morph.base) : 0
+				};
+				addFrameData(frameDatas, keyData);
+				verbose("add JSON frame data. frame:", frameNum, "prop:", morph.prop, "base:", keyData.baseValue);
+			}
+		}
+		frameCount++;
+	}
+	print("added", frameCount, "JSON frames from:", sFilename);
+	return frameDatas;
+}
+
 function printCSV(frameDatas, sOutFilename){
 	lines = [];
 	if(!frameDatas){
@@ -445,8 +581,17 @@ function applyKeyData(oNodeRoot, keyData, overrideFrameIdx){
 			//*********** Main action - create the morph frame;
 			// if(createMorphFrameByKey(oProp, keyData.frameIdx, keyData.propValue, iKey)){
 			var frameIdx = overrideFrameIdx == undefined ? keyData.frameIdx : overrideFrameIdx;
+			var baseValue = (keyData.baseValue !== undefined) ? keyData.baseValue : 0;
 
-			if(createMorphFrame(oProp, frameIdx, keyData.propValue)){
+			// Check for noSawtooth flag - just set value at this frame without affecting adjacent frames
+			if (keyData.noSawtooth) {
+				var timeStep = Scene.getTimeStep();
+				oProp.setValue(frameIdx * timeStep, keyData.propValue);
+				verbose("Set value (no sawtooth) on", keyData.nodeName, "prop:", keyData.propName, "=", keyData.propValue, "at frame", frameIdx);
+				return true;
+			}
+
+			if(createMorphFrame(oProp, frameIdx, keyData.propValue, baseValue)){
 				verbose("Successfully created morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
 				return true;
 			}
@@ -503,32 +648,33 @@ function createMorphFrameByKey( oProperty, iFrame, fValue, iKey){
 }
 
 /** **************************************************************************/
-function createMorphFrame( oProperty, iFrame, fValue ){
+// Creates a sawtooth keyframe pattern: adjacent frames are set to fBaseValue,
+// target frame is set to fValue. This prevents morph value leakage.
+// fBaseValue defaults to 0 if not specified.
+function createMorphFrame( oProperty, iFrame, fValue, fBaseValue ){
 	if( !oProperty ){
 		print("Error: Property is null.");
-		return false;	
+		return false;
 	}
 	if( !oProperty.inherits("DzFloatProperty")){
-		print("Error: Property is not a DzFloatProperty.");		
-		return false;	
+		print("Error: Property is not a DzFloatProperty.");
+		return false;
 	}
-		verbose("Property: " + oProperty.getLabel() );
+	// Default base value to 0 for true sawtooth anchoring
+	fBaseValue = (fBaseValue !== undefined) ? fBaseValue : 0;
+
+	verbose("Property: " + oProperty.getLabel() );
 	var timeStep = Scene.getTimeStep();
 	var tTarget = iFrame * timeStep;
 	var tPrev = iFrame * timeStep - timeStep;
 	var tNext = iFrame * timeStep + timeStep;
-	var fPrevValue = oProperty.getValue(tPrev);
-	var fNextValue = oProperty.getValue(tNext);
-		
-	//Set the target frame to new value		
-	// if (tPrev > 0){
-		oProperty.setValue(tPrev, fPrevValue);
-		verbose("Property ", oProperty.getLabel(), " set at frame ", tPrev/timeStep, "to", fPrevValue);
-	// }
-	// if (iFrame + 1 < Scene.getAnimRange().end){
-		oProperty.setValue(tNext, fNextValue);
-		verbose("Property ", oProperty.getLabel(), " set at frame ", tNext/timeStep, " to ", fNextValue);
-	// }
+
+	// Set adjacent frames to base value (not interpolated value) for true sawtooth
+	oProperty.setValue(tPrev, fBaseValue);
+	verbose("Property ", oProperty.getLabel(), " set at frame ", tPrev/timeStep, "to", fBaseValue);
+	oProperty.setValue(tNext, fBaseValue);
+	verbose("Property ", oProperty.getLabel(), " set at frame ", tNext/timeStep, " to ", fBaseValue);
+	// Set target frame to the desired value
 	oProperty.setValue(tTarget, fValue);
 	verbose("Set morph frame for", oProperty.getLabel(), "at frame", iFrame, "to value", fValue);
 	return true;
@@ -662,4 +808,95 @@ function restorePreservedMorphs(oNodeRoot, preserveMorphs) {
             print("WARNING: Could not find preserved morph:", config.name);
         }
     }
+}
+
+// Applies GP art direction morphs from GP9_ArtDirection.json to the GP ROM frames
+// sJsonPath: path to GP9_ArtDirection.json
+// oNodeRoot: root node (Genesis9)
+// startFrame: frame where GP ROM starts (e.g., 328 for DQS)
+function applyGPArtDirection(sJsonPath, oNodeRoot, startFrame) {
+    var oFile = new DzFile(sJsonPath);
+    if (!oFile.open(oFile.ReadOnly)) {
+        print("WARNING: Could not open GP art direction file:", sJsonPath);
+        return false;
+    }
+
+    var sContent = oFile.read();
+    oFile.close();
+
+    var jsonData;
+    try {
+        jsonData = JSON.parse(sContent);
+    } catch (e) {
+        print("ERROR: Failed to parse GP art direction JSON:", e);
+        return false;
+    }
+
+    if (!jsonData.frames || !Array.isArray(jsonData.frames)) {
+        print("ERROR: GP art direction JSON missing 'frames' array");
+        return false;
+    }
+
+    var timeStep = Scene.getTimeStep();
+    var appliedCount = 0;
+
+    for (var i = 0; i < jsonData.frames.length; i++) {
+        var frameEntry = jsonData.frames[i];
+        var absoluteFrame = parseInt(frameEntry.frame) + startFrame;
+
+        if (!frameEntry.morphs || frameEntry.morphs.length === 0) {
+            continue;
+        }
+
+        print("Applying GP art direction for", frameEntry.name, "at frame", absoluteFrame);
+
+        for (var j = 0; j < frameEntry.morphs.length; j++) {
+            var morph = frameEntry.morphs[j];
+
+            // Find the node
+            var oNode;
+            if (oNodeRoot.getName() === morph.node || oNodeRoot.getLabel() === morph.node) {
+                oNode = oNodeRoot;
+            } else {
+                oNode = oNodeRoot.findNodeChild(morph.node, true);
+            }
+            if (!oNode) {
+                oNode = oNodeRoot.findNodeChildByLabel(morph.node, true);
+            }
+
+            if (!oNode) {
+                print("  WARNING: Node not found:", morph.node);
+                continue;
+            }
+
+            // Find the property
+            var oProp = getMorphPropFromNode(oNode, morph.prop);
+            if (!oProp) {
+                var oObj = oNode.getObject();
+                if (oObj) {
+                    for (var m = 0; m < oObj.getNumModifiers(); m++) {
+                        var mod = oObj.getModifier(m);
+                        if (mod.getLabel() === morph.prop || mod.getName() === morph.prop) {
+                            if (mod.getValueChannel) oProp = mod.getValueChannel(0);
+                            if (!oProp && mod.getValueControl) oProp = mod.getValueControl();
+                            if (oProp) break;
+                        }
+                    }
+                }
+            }
+
+            if (!oProp) {
+                print("  WARNING: Property not found:", morph.prop, "on node", morph.node);
+                continue;
+            }
+
+            // Apply the morph value at this frame using sawtooth pattern
+            createMorphFrame(oProp, absoluteFrame, morph.value);
+            print("  Set", morph.prop, "=", morph.value, "at frame", absoluteFrame, "(sawtooth)");
+            appliedCount++;
+        }
+    }
+
+    print("Applied", appliedCount, "GP art direction morphs");
+    return true;
 }

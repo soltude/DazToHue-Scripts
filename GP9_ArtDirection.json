@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "GP9 Art Direction - relative offsets from GP ROM start (DQS: GP starts at frame 328). Fill in morphs arrays with actual GP9 property names."
+  },
+  "frames": [
+    {
+      "frame": 96,
+      "section": "GP9",
+      "name": "VaginaOpen",
+      "morphs": []
+    },
+    {
+      "frame": 97,
+      "section": "GP9",
+      "name": "VaginaSqueeze",
+      "morphs": [
+        { "node": "Genesis 9", "prop": "GP_Vagina_Open_Squeeze", "value": 1.0 }        
+      ]
+    },
+    {
+      "frame": 98,
+      "section": "GP9",
+      "name": "VaginaStretch",
+      "morphs": [
+        { "node": "Genesis 9", "prop": "GP_Vagina_Open_Stretch", "value": 1.0 }
+      ]
+    },
+    {
+      "frame": 100,
+      "section": "GP9",
+      "name": "AnusOpen",
+      "morphs": [
+        { "node": "Genesis 9", "prop": "GP_Anus_Open", "value": 0.9 }
+      ]
+    },
+    {
+      "frame": 101,
+      "section": "GP9",
+      "name": "AnusContraction",
+      "morphs": [
+        { "node": "Genesis 9", "prop": "GP_PR_Anus_Contraction07", "value": 1.0 }
+      ]
+    },
+    {
+      "frame": 103,
+      "section": "GP9",
+      "name": "ClitorisErect",
+      "morphs": [
+        { "node": "GoldenPalace_G9", "prop": "GP_Clitoris_Erection1", "value": 1.0 },
+        { "node": "GoldenPalace_G9", "prop": "GP_Clitoris_Erection2", "value": 0.5 },
+        { "node": "GoldenPalace_G9", "prop": "GP_Clitoris_Scale1", "value": 0.3 },
+        { "node": "GoldenPalace_G9", "prop": "GP_Clitoris_Scale2", "value": 0.3 }
+      ]
+    }
+  ]
+}

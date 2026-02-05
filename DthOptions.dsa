@@ -15,7 +15,8 @@ var options = {
 	bDQS: false,// set true to enable Dual Quat Skinning, defaults to linear
 	FACsDetailStrength: 1.0,
 	FlexionStrength: 1.0,
-	extraCSVs:[],
+	extraJSONs: [],
+	extraCSVs: [],  // Legacy - only used by DthExportFBMs.dsa
 	scannedCSV: dir_self.filePath ("OUT.csv"),
 	successCSV: dir_self.filePath ("OUT_success.csv"),
 	failCSV: dir_self.filePath ("OUT_failed.csv"),

@@ -71,7 +71,7 @@ function ApplyDTHWorkflow(options){
 	}
 
 	/** ****************************************************************/
-	print("Creating FrameDatas from extraCSVs");
+	print("Creating FrameDatas from extraJSONs");
 	var startFrame = Scene.getAnimRange().end / Scene.getTimeStep();
 	// hack to enable loading only from CSV
 	startFrame = !options.bIncludeJCM ? 0 : startFrame;
@@ -85,7 +85,7 @@ function ApplyDTHWorkflow(options){
 	resetFrameDatasAtFrame(oNodeRoot, frameDatas, 0);
 
 	/** ****************************************************************/
-	print("Applying FrameDatas from extraCSVs");
+	print("Applying FrameDatas from extraJSONs");
 	var successFrameDatas = [];
 	var failedFrameDatas = [];
 	applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDatas);
@@ -113,20 +113,19 @@ function ApplyDTHWorkflow(options){
 function CreateFrameDatas(options, startFrame){
 	frameDatas = [];
 	var iOffset = startFrame;
-	print("Loading CSVs starting at frame", iOffset);
-	extraCSVs = options.extraCSVs;
-	if(extraCSVs){
-		for(var i = 0; i < extraCSVs.length; i++){
-			sFilename = extraCSVs[i];
-			print("attempting to read CSV file at:", sFilename);
+	print("Loading JSONs starting at frame", iOffset);
+	var extraJSONs = options.extraJSONs;
+	if(extraJSONs){
+		for(var i = 0; i < extraJSONs.length; i++){
+			var sFilename = extraJSONs[i];
+			print("attempting to read JSON file at:", sFilename);
 			// frameDatas is modified
-			readPropsCSV(sFilename, frameDatas, iOffset);
+			readFrameDataJSON(sFilename, frameDatas, iOffset);
 			iOffset = frameDatas.length;
-			print(" - New frame count:", iOffset);	
+			print(" - New frame count:", iOffset);
 		}
 	}
 	return frameDatas;
-
 }
 
 function ApplyInitialValues(options, oNodeRoot){
@@ -205,6 +204,10 @@ function ApplyGP9(options, oNodeRoot, oNodeGP, startFrame){
 		print("Failed loading ROM:", ROM_GP9);
 		return false;
 	}
+
+	// Apply GP art direction morphs from JSON
+	var gpArtDirectionPath = dir_self.filePath("GP9_ArtDirection.json");
+	applyGPArtDirection(gpArtDirectionPath, oNodeRoot, startFrame);
 
 	var aFenceFrames = options["aGPFenceOffsets"].map(function(x){ return x + startFrame; });
 	print("Setting fence poses for", oNodeGP.objectName, "from frame", 0, "to", aFenceFrames);

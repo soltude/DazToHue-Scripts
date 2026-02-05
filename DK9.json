@@ -1,0 +1,373 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "DK9 Dicktator morphs - relative frame offsets from ROM start"
+  },
+  "frames": [
+    {
+      "frame": 1,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_ShaftRoot_Bend", "value": 1 }
+      ]
+    },
+    {
+      "frame": 2,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_ShaftRoot_Bend", "value": -1 }
+      ]
+    },
+    {
+      "frame": 3,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_ShaftRoot_Side-Side", "value": 1 }
+      ]
+    },
+    {
+      "frame": 4,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_ShaftRoot_Side-Side", "value": -1 }
+      ]
+    },
+    {
+      "frame": 5,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_ShaftRoot_Twist", "value": -1 }
+      ]
+    },
+    {
+      "frame": 6,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_ShaftRoot_Twist", "value": 1 }
+      ]
+    },
+    {
+      "frame": 7,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_Shaft_BendAll", "value": 1 }
+      ]
+    },
+    {
+      "frame": 8,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_Shaft_BendAll", "value": -1 }
+      ]
+    },
+    {
+      "frame": 9,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_Shaft_Side-SideAll", "value": 1 }
+      ]
+    },
+    {
+      "frame": 10,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_Shaft_Side-SideAll", "value": -1 }
+      ]
+    },
+    {
+      "frame": 11,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_Shaft_TwistAll", "value": -1 }
+      ]
+    },
+    {
+      "frame": 12,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_Shaft_TwistAll", "value": 1 }
+      ]
+    },
+    {
+      "frame": 13,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "scrotum", "prop": "XRotate", "value": 60 }
+      ]
+    },
+    {
+      "frame": 14,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "scrotum", "prop": "XRotate", "value": -60 }
+      ]
+    },
+    {
+      "frame": 15,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "scrotum", "prop": "YRotate", "value": -60 }
+      ]
+    },
+    {
+      "frame": 16,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "scrotum", "prop": "YRotate", "value": 60 }
+      ]
+    },
+    {
+      "frame": 17,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "scrotum", "prop": "ZRotate", "value": 60 }
+      ]
+    },
+    {
+      "frame": 18,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "scrotum", "prop": "ZRotate", "value": -60 }
+      ]
+    },
+    {
+      "frame": 19,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_Scrotum_Stretch", "value": 1 }
+      ]
+    },
+    {
+      "frame": 20,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_Scrotum_Compact1", "value": 1 }
+      ]
+    },
+    {
+      "frame": 21,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "l_testicle", "prop": "XTranslate", "value": 2 }
+      ]
+    },
+    {
+      "frame": 22,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "l_testicle", "prop": "XTranslate", "value": -2 }
+      ]
+    },
+    {
+      "frame": 23,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "l_testicle", "prop": "YTranslate", "value": 2 }
+      ]
+    },
+    {
+      "frame": 24,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "l_testicle", "prop": "YTranslate", "value": -2 }
+      ]
+    },
+    {
+      "frame": 25,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "l_testicle", "prop": "ZTranslate", "value": 2 }
+      ]
+    },
+    {
+      "frame": 26,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "l_testicle", "prop": "ZTranslate", "value": -2 }
+      ]
+    },
+    {
+      "frame": 27,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "r_testicle", "prop": "XTranslate", "value": -2 }
+      ]
+    },
+    {
+      "frame": 28,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "r_testicle", "prop": "XTranslate", "value": 2 }
+      ]
+    },
+    {
+      "frame": 29,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "r_testicle", "prop": "YTranslate", "value": 2 }
+      ]
+    },
+    {
+      "frame": 30,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "r_testicle", "prop": "YTranslate", "value": -2 }
+      ]
+    },
+    {
+      "frame": 31,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "r_testicle", "prop": "ZTranslate", "value": 2 }
+      ]
+    },
+    {
+      "frame": 32,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "r_testicle", "prop": "ZTranslate", "value": -2 }
+      ]
+    },
+    {
+      "frame": 40,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "foreskin_06", "prop": "XRotate", "value": -5 },
+        { "node": "foreskin_07", "prop": "XRotate", "value": -10 },
+        { "node": "foreskin_08", "prop": "XRotate", "value": -15 },
+        { "node": "foreskin_09", "prop": "XRotate", "value": -20 }
+      ]
+    },
+    {
+      "frame": 41,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "foreskin_06", "prop": "XRotate", "value": 5 },
+        { "node": "foreskin_07", "prop": "XRotate", "value": 10 },
+        { "node": "foreskin_08", "prop": "XRotate", "value": 15 },
+        { "node": "foreskin_09", "prop": "XRotate", "value": 20 }
+      ]
+    },
+    {
+      "frame": 42,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "foreskin_06", "prop": "YRotate", "value": 5 },
+        { "node": "foreskin_07", "prop": "YRotate", "value": 10 },
+        { "node": "foreskin_08", "prop": "YRotate", "value": 15 },
+        { "node": "foreskin_09", "prop": "YRotate", "value": 20 }
+      ]
+    },
+    {
+      "frame": 43,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "foreskin_06", "prop": "YRotate", "value": -5 },
+        { "node": "foreskin_07", "prop": "YRotate", "value": -10 },
+        { "node": "foreskin_08", "prop": "YRotate", "value": -15 },
+        { "node": "foreskin_09", "prop": "YRotate", "value": -20 }
+      ]
+    },
+    {
+      "frame": 44,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "foreskin_06", "prop": "ZRotate", "value": -5 },
+        { "node": "foreskin_07", "prop": "ZRotate", "value": -10 },
+        { "node": "foreskin_08", "prop": "ZRotate", "value": -15 },
+        { "node": "foreskin_09", "prop": "ZRotate", "value": -20 }
+      ]
+    },
+    {
+      "frame": 45,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "foreskin_06", "prop": "ZRotate", "value": 5 },
+        { "node": "foreskin_07", "prop": "ZRotate", "value": 10 },
+        { "node": "foreskin_08", "prop": "ZRotate", "value": 15 },
+        { "node": "foreskin_09", "prop": "ZRotate", "value": 20 }
+      ]
+    },
+    {
+      "frame": 48,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "pelvis", "prop": "body_bs_FlexGluteClenchR", "value": 0.9427480697631836 },
+        { "node": "pelvis", "prop": "body_bs_FlexGluteClenchL", "value": 0.9427480697631836 },
+        { "node": "Genesis9", "prop": "body_bs_FlexGluteClenchR", "value": 0.9427480697631836 },
+        { "node": "Genesis9", "prop": "body_bs_FlexGluteClenchL", "value": 0.9427480697631836 },
+        { "node": "G9Dicktator_8666", "prop": "DK_Shaft_Shorten", "value": 0.09881424903869629 }
+      ]
+    },
+    {
+      "frame": 50,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "Genesis9", "prop": "DK_AnusContraction_Preset1", "value": 0.09090909361839294 },
+        { "node": "Genesis9", "prop": "DK_Anus_Open3", "value": 0.3913043439388275 },
+        { "node": "Genesis9", "prop": "DK_Anus_Open1", "value": 0.6719367504119873 },
+        { "node": "Genesis9", "prop": "DK_Anus_Open2", "value": 0.18972331285476685 }
+      ]
+    },
+    {
+      "frame": 51,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "pelvis", "prop": "body_bs_FlexGluteClenchR", "value": 1 },
+        { "node": "pelvis", "prop": "body_bs_FlexGluteClenchL", "value": 1 },
+        { "node": "Genesis9", "prop": "body_bs_FlexGluteClenchR", "value": 1 },
+        { "node": "Genesis9", "prop": "body_bs_FlexGluteClenchL", "value": 1 }
+      ]
+    },
+    {
+      "frame": 53,
+      "section": "",
+      "name": "",
+      "morphs": [
+        { "node": "G9Dicktator_8666", "prop": "DK_Shaft_Scale2", "value": -0.5 },
+        { "node": "G9Dicktator_8666", "prop": "DK_ShaftLength", "value": -0.5 }
+      ]
+    }
+  ]
+}

@@ -13,9 +13,9 @@ options.bIncludeDK = false;
 options.bIncludeGP = true;   // Golden Palace ROM (~103 frames)
 options.bDQS = true;         // DQS mode = 328 base frames
 
-// Add FBM morphs CSV
-options.extraCSVs = [
-    dir_self.filePath("ElectraG9_FBMs.csv")
+// Add FBM morphs JSON
+options.extraJSONs = [
+    dir_self.filePath("ElectraG9_FBMs.json")
 ];
 
 // Preserve Electra's breast position after ROM loading

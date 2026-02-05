@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(cmdkey:*)",
+      "Bash(findstr:*)",
+      "Bash(git credential-manager:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git push:*)",
+      "Bash(dir:*)",
+      "Bash(git config:*)"
+    ]
+  }
+}
