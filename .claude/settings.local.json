@@ -8,7 +8,10 @@
       "Bash(git remote set-url:*)",
       "Bash(git push:*)",
       "Bash(dir:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "WebSearch",
+      "WebFetch(domain:www.daz3d.com)",
+      "WebFetch(domain:docs.daz3d.com)"
     ]
   }
 }

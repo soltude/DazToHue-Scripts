@@ -12,6 +12,8 @@ var options = {
 	bIncludeGP: false,
 	// Offsets for the fence poses, relative to the first frame of the GP ROM file
 	aGPFenceOffsets: [0, 95, 99, 102],
+	// Offsets for the fence poses, relative to the first frame of the DK9 ROM file
+	aDK9FenceOffsets: [0, 33, 46, 47, 49, 52],
 	bDQS: false,// set true to enable Dual Quat Skinning, defaults to linear
 	FACsDetailStrength: 1.0,
 	FlexionStrength: 1.0,
@@ -21,7 +23,10 @@ var options = {
 	successCSV: dir_self.filePath ("OUT_success.csv"),
 	failCSV: dir_self.filePath ("OUT_failed.csv"),
 	// Morphs to preserve after ROM loading. Example: [{ name: "body_ctrl_BreastsUp-Down", keepValue: 1 }]
-	preserveMorphs: []
+	preserveMorphs: [],
+	// Node transforms to preserve after ROM loading. Example: [{ nodeLabel: "Left Eye" }]
+	preserveNodeTransforms: [],
+	jcmMorphMods: []
 };
 
 

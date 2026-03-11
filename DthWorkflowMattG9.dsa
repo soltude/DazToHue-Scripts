@@ -1,0 +1,48 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+// DTH Workflow for Matt G9 (male) with FBM morphs
+// Uses Dicktator 9 as genital addon (Linear mode)
+// Uses soltude/DazToHue-Scripts framework
+
+var dir_self = new DzDir(new DzFileInfo(getScriptFileName()).path());
+include(dir_self.filePath("DthWorkflow.dsa"));
+
+// Override default options for Matt G9 workflow
+options.bIncludeJCM = true;
+options.bIncludeFAC = true;
+options.bIncludeDK = true;    // Dicktator 9 ROM (~53 frames)
+options.bIncludeGP = false;
+options.bDQS = true;          // DQS mode = 328 base frames
+
+// DK9 fence offsets (relative to DK9 ROM start)
+options.aDK9FenceOffsets = [0, 33, 46, 47, 49, 52];
+
+// Add FBM morphs JSON
+options.extraJSONs = [
+    dir_self.filePath("MattG9_FBMs.json")
+];
+
+// Preserve eye transforms after ROM loading (memorized before ROMs, restored after)
+/*options.preserveNodeTransforms = [
+    { nodeLabel: "Left Eye" },
+    { nodeLabel: "Right Eye" }
+];*/
+
+// JCM morph modifications - drive morphs proportionally to bone rotation
+/*options.jcmMorphMods = [
+    {
+        boneLabel: "Left Thigh",
+        axis: "XRotate",
+        positive: [],
+        negative: []
+    },
+    {
+        boneLabel: "Right Thigh",
+        axis: "XRotate",
+        positive: [],
+        negative: []
+    }
+];*/
+
+// Run the workflow
+ApplyDTHWorkflow(options);

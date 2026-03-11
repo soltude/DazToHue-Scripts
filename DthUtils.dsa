@@ -773,6 +773,51 @@ function approx_eq(fValue1, fValue2){
 	return Math.abs(fValue1 - fValue2) < EPSILON;
 }
 
+// Selects one or more nodes for action-based operations (e.g. Object Memorize/Restore)
+// oNodes can be a single DzNode or an array of DzNodes
+function selectNodes(oNodes) {
+    Scene.selectAllNodes(false);
+    if (!Array.isArray(oNodes)) {
+        oNodes = [oNodes];
+    }
+    for (var i = 0; i < oNodes.length; i++) {
+        if (oNodes[i]) {
+            oNodes[i].select(true);
+        }
+    }
+}
+
+// Scans all 10 transform controls on a node for keyframes
+// Returns sorted array of unique frame numbers (excluding frame 0)
+function getTransformKeyframes(oNode) {
+    var timeStep = Scene.getTimeStep();
+    var frameMap = {};
+    var controls = [
+        oNode.getXPosControl(), oNode.getYPosControl(), oNode.getZPosControl(),
+        oNode.getXRotControl(), oNode.getYRotControl(), oNode.getZRotControl(),
+        oNode.getScaleControl(),
+        oNode.getXScaleControl(), oNode.getYScaleControl(), oNode.getZScaleControl()
+    ];
+
+    for (var c = 0; c < controls.length; c++) {
+        var ctrl = controls[c];
+        if (!ctrl) continue;
+        for (var k = 0; k < ctrl.getNumKeys(); k++) {
+            var frame = Math.round(ctrl.getKeyTime(k) / timeStep);
+            if (frame > 0) {
+                frameMap[frame] = true;
+            }
+        }
+    }
+
+    var frames = [];
+    for (var f in frameMap) {
+        frames.push(parseInt(f));
+    }
+    frames.sort(function(a, b) { return a - b; });
+    return frames;
+}
+
 // Restores morphs specified in options.preserveMorphs to their keepValue
 // preserveMorphs format: [{ name: "body_ctrl_BreastsUp-Down", keepValue: 1 }, ...]
 function restorePreservedMorphs(oNodeRoot, preserveMorphs) {
@@ -806,6 +851,357 @@ function restorePreservedMorphs(oNodeRoot, preserveMorphs) {
             print("Restored preserved morph:", config.name, "to", config.keepValue);
         } else {
             print("WARNING: Could not find preserved morph:", config.name);
+        }
+    }
+}
+
+// Returns the rotation control for a bone node given an axis string.
+// axis: "XRotate", "YRotate", or "ZRotate"
+function getRotationControl(oNode, axis) {
+    if (axis === "XRotate") return oNode.getXRotControl();
+    if (axis === "YRotate") return oNode.getYRotControl();
+    if (axis === "ZRotate") return oNode.getZRotControl();
+    print("WARNING: Unknown rotation axis:", axis);
+    return null;
+}
+
+// Pre-resolves morph property references for a list of morph entries.
+// Handles "!" prefix for controller properties vs morph modifiers.
+// Returns array of { oProp, range, morphName }.
+function resolveMorphProps(oNodeRoot, morphEntries) {
+    var resolved = [];
+    for (var i = 0; i < morphEntries.length; i++) {
+        var entry = morphEntries[i];
+        var name = entry.morphName;
+        var oProp = null;
+
+        if (name.charAt(0) === "!") {
+            // Controller property - strip prefix and find via findProperty/findPropertyByLabel
+            var ctrlName = name.substring(1);
+            oProp = oNodeRoot.findProperty(ctrlName);
+            if (!oProp) {
+                oProp = oNodeRoot.findPropertyByLabel(ctrlName);
+            }
+        } else {
+            // Morph modifier - try getMorphPropFromNode first, then fallback
+            oProp = getMorphPropFromNode(oNodeRoot, name);
+
+            // Loop through all modifiers and check by label/name
+            if (!oProp) {
+                var oObj = oNodeRoot.getObject();
+                if (oObj) {
+                    for (var m = 0; m < oObj.getNumModifiers(); m++) {
+                        var mod = oObj.getModifier(m);
+                        if (mod.getLabel() === name || mod.getName() === name) {
+                            if (mod.getValueChannel) {
+                                oProp = mod.getValueChannel(0);
+                            }
+                            if (!oProp && mod.getValueControl) {
+                                oProp = mod.getValueControl();
+                            }
+                            if (!oProp && mod.getChannel) {
+                                oProp = mod.getChannel(0);
+                            }
+                            if (oProp) break;
+                        }
+                    }
+                }
+            }
+
+            if (!oProp) {
+                oProp = oNodeRoot.findProperty(name);
+            }
+            if (!oProp) {
+                oProp = oNodeRoot.findPropertyByLabel(name);
+            }
+        }
+
+        if (oProp) {
+            resolved.push({ oProp: oProp, range: entry.range, morphName: name });
+        } else {
+            print("WARNING: Could not resolve morph property:", name);
+        }
+    }
+    return resolved;
+}
+
+// Applies interpolated morph values based on bone rotation angle.
+// Linear interpolation from angle range to value range, clamped.
+// Returns count of morphs applied.
+function applyMorphModEntries(resolvedEntries, angle, keyTime) {
+    var count = 0;
+    for (var i = 0; i < resolvedEntries.length; i++) {
+        var entry = resolvedEntries[i];
+        var aStart = entry.range.angle.start;
+        var aEnd = entry.range.angle.end;
+        var vStart = entry.range.value.start;
+        var vEnd = entry.range.value.end;
+
+        // Clamp angle to the range
+        var clampedAngle;
+        if (aStart < aEnd) {
+            clampedAngle = Math.max(aStart, Math.min(aEnd, angle));
+        } else {
+            clampedAngle = Math.min(aStart, Math.max(aEnd, angle));
+        }
+
+        // Linear interpolation: map angle to value
+        var t = (aEnd !== aStart) ? (clampedAngle - aStart) / (aEnd - aStart) : 0;
+        var value = vStart + t * (vEnd - vStart);
+
+        entry.oProp.setValue(keyTime, value);
+        verbose("  JcmMorphMod:", entry.morphName, "angle:", angle, "-> value:", value);
+        count++;
+    }
+    return count;
+}
+
+// Resets morphs that are exclusive to sourceEntries (not in otherEntries) to 0.
+// This prevents morphs from one direction lingering when rotation crosses zero.
+function resetExclusiveMorphs(sourceEntries, otherEntries, keyTime) {
+    for (var i = 0; i < sourceEntries.length; i++) {
+        var isShared = false;
+        for (var j = 0; j < otherEntries.length; j++) {
+            if (sourceEntries[i].morphName === otherEntries[j].morphName) {
+                isShared = true;
+                break;
+            }
+        }
+        if (!isShared) {
+            sourceEntries[i].oProp.setValue(keyTime, 0);
+            verbose("  Reset exclusive morph:", sourceEntries[i].morphName, "to 0");
+        }
+    }
+}
+
+// Main function: applies JCM morph modifications based on bone rotation keyframes.
+// Reads rotation keyframes from bones specified in jcmMorphMods config,
+// then sets morph values proportionally using linear interpolation.
+function applyJcmMorphMods(oNodeRoot, jcmMorphMods) {
+    if (!jcmMorphMods || jcmMorphMods.length === 0) {
+        return;
+    }
+
+    var timeStep = Scene.getTimeStep();
+
+    for (var i = 0; i < jcmMorphMods.length; i++) {
+        var config = jcmMorphMods[i];
+        var oNode = oNodeRoot.findNodeChildByLabel(config.boneLabel, true);
+        if (!oNode) {
+            oNode = oNodeRoot.findNodeChild(config.boneLabel, true);
+        }
+        if (!oNode) {
+            print("WARNING: Could not find bone node:", config.boneLabel);
+            continue;
+        }
+
+        var rotCtrl = getRotationControl(oNode, config.axis);
+        if (!rotCtrl) {
+            print("WARNING: Could not get rotation control for", config.boneLabel, config.axis);
+            continue;
+        }
+
+        // Pre-resolve morph properties
+        var posEntries = resolveMorphProps(oNodeRoot, config.positive || []);
+        var negEntries = resolveMorphProps(oNodeRoot, config.negative || []);
+
+        var numKeys = rotCtrl.getNumKeys();
+        print("Processing", numKeys, "rotation keyframes on", config.boneLabel, config.axis);
+
+        for (var k = 0; k < numKeys; k++) {
+            var keyTime = rotCtrl.getKeyTime(k);
+            var angle = rotCtrl.getKeyValue(k);
+
+            if (approx_eq(angle, 0)) {
+                // Angle is ~0: reset all morphs to 0
+                for (var p = 0; p < posEntries.length; p++) {
+                    posEntries[p].oProp.setValue(keyTime, 0);
+                }
+                for (var n = 0; n < negEntries.length; n++) {
+                    negEntries[n].oProp.setValue(keyTime, 0);
+                }
+            } else if (angle > 0) {
+                applyMorphModEntries(posEntries, angle, keyTime);
+                resetExclusiveMorphs(negEntries, posEntries, keyTime);
+            } else {
+                applyMorphModEntries(negEntries, angle, keyTime);
+                resetExclusiveMorphs(posEntries, negEntries, keyTime);
+            }
+        }
+
+        print("Applied JCM morph modifications for", config.boneLabel, config.axis,
+              "- positive morphs:", posEntries.length, "negative morphs:", negEntries.length);
+    }
+}
+
+// Memorizes transform properties for nodes listed in preserveNodeTransforms before ROM loading.
+// Uses DAZ's Object Memorize action (DzMemorizeSelectedItemsAction) to store current transforms
+// as defaults, with direct accessor save as fallback data.
+// preserveNodeTransforms format: [{ nodeLabel: "Left Eye" }, ...]
+function memorizeNodeTransforms(oNodeRoot, preserveNodeTransforms) {
+    if (!preserveNodeTransforms || preserveNodeTransforms.length === 0) {
+        return;
+    }
+
+    var resolvedNodes = [];
+    for (var i = 0; i < preserveNodeTransforms.length; i++) {
+        var config = preserveNodeTransforms[i];
+        if (!config.nodeLabel) continue;
+
+        var oNode = oNodeRoot.findNodeChildByLabel(config.nodeLabel, true);
+        if (!oNode) {
+            print("WARNING: Could not find node for transform memorize:", config.nodeLabel);
+            continue;
+        }
+
+        config._node = oNode;
+        resolvedNodes.push(oNode);
+
+        // Save transform values via direct accessors (fallback data)
+        var controls = [
+            { label: "XTranslate", ctrl: oNode.getXPosControl() },
+            { label: "YTranslate", ctrl: oNode.getYPosControl() },
+            { label: "ZTranslate", ctrl: oNode.getZPosControl() },
+            { label: "XRotate",    ctrl: oNode.getXRotControl() },
+            { label: "YRotate",    ctrl: oNode.getYRotControl() },
+            { label: "ZRotate",    ctrl: oNode.getZRotControl() },
+            { label: "Scale",      ctrl: oNode.getScaleControl() },
+            { label: "XScale",    ctrl: oNode.getXScaleControl() },
+            { label: "YScale",    ctrl: oNode.getYScaleControl() },
+            { label: "ZScale",    ctrl: oNode.getZScaleControl() }
+        ];
+
+        config.savedTransforms = [];
+        for (var t = 0; t < controls.length; t++) {
+            var ctrl = controls[t].ctrl;
+            if (ctrl) {
+                config.savedTransforms.push({
+                    label: controls[t].label,
+                    ctrl: ctrl,
+                    value: ctrl.getValue()
+                });
+                verbose("Saved transform", config.nodeLabel, controls[t].label, "=", ctrl.getValue());
+            }
+        }
+        print("Saved", config.savedTransforms.length, "transforms for node:", config.nodeLabel);
+    }
+
+    // Select all target nodes and memorize them via Object Memorize action
+    if (resolvedNodes.length > 0) {
+        Scene.setTime(0);
+        selectNodes(resolvedNodes);
+        config._useActions = triggerAction("DzMemorizeSelectedItemsAction");
+        if (config._useActions) {
+            print("Discovered Object Memorize/Restore actions - will use action-based restore");
+        } else {
+            print("WARNING: DzMemorizeSelectedItemsAction not available - will use fallback restore");
+        }
+    }
+}
+
+// Restores transform properties for nodes listed in preserveNodeTransforms after ROM loading.
+// Primary path: uses DAZ Object Memorize/Restore actions (matching the manual workflow).
+// Fallback path: uses direct setValue on all keyframes (if actions not available).
+function restoreNodeTransforms(oNodeRoot, preserveNodeTransforms) {
+    if (!preserveNodeTransforms || preserveNodeTransforms.length === 0) {
+        return;
+    }
+
+    var timeStep = Scene.getTimeStep();
+
+    // Check if action-based restore is available (set by memorizeNodeTransforms)
+    var useActions = false;
+    for (var i = 0; i < preserveNodeTransforms.length; i++) {
+        if (preserveNodeTransforms[i]._useActions) {
+            useActions = true;
+            break;
+        }
+    }
+
+    if (useActions) {
+        // === ACTION-BASED RESTORE (primary path) ===
+        print("Using action-based Object Memorize/Restore for transform restoration");
+
+        // Step 1: Collect resolved nodes
+        var resolvedNodes = [];
+        for (var i = 0; i < preserveNodeTransforms.length; i++) {
+            var config = preserveNodeTransforms[i];
+            if (!config.nodeLabel) continue;
+            var oNode = config._node || oNodeRoot.findNodeChildByLabel(config.nodeLabel, true);
+            if (!oNode) continue;
+            resolvedNodes.push(oNode);
+        }
+
+        // Step 2: At frame 0, restore memorized transforms (captured before ROM loading)
+        Scene.setTime(0);
+        selectNodes(resolvedNodes);
+        triggerAction("DzRestoreSelectedItemsAction");
+        print("Restored memorized transforms at frame 0");
+
+        // Step 3: Memorize Figure (captures corrected frame 0 as figure defaults)
+        Scene.selectAllNodes(false);
+        oNodeRoot.select(true);
+        Scene.setPrimarySelection(oNodeRoot);
+        triggerAction("DzMemorizeFigureAction");
+        print("Memorized figure for root node at frame 0");
+
+        // Step 4: Scan keyframes on all target nodes' transform controls
+        var allFrames = {};
+        for (var i = 0; i < preserveNodeTransforms.length; i++) {
+            var config = preserveNodeTransforms[i];
+            var oNode = config._node || oNodeRoot.findNodeChildByLabel(config.nodeLabel, true);
+            if (!oNode) continue;
+
+            var nodeFrames = getTransformKeyframes(oNode);
+            for (var f = 0; f < nodeFrames.length; f++) {
+                allFrames[nodeFrames[f]] = true;
+            }
+        }
+
+        var frameList = [];
+        for (var f in allFrames) {
+            frameList.push(parseInt(f));
+        }
+        frameList.sort(function(a, b) { return a - b; });
+
+        print("Restoring transforms at", frameList.length, "frames:", frameList.join(", "));
+
+        // Step 5: Select all target nodes, then restore at each keyframe
+        selectNodes(resolvedNodes);
+        for (var f = 0; f < frameList.length; f++) {
+            Scene.setTime(frameList[f] * timeStep);
+            triggerAction("DzRestoreSelectedItemsAction");
+            verbose("Restored selected items at frame", frameList[f]);
+        }
+
+        print("Action-based transform restoration complete");
+
+    } else {
+        // === FALLBACK PATH (direct setValue) ===
+        print("Using fallback direct setValue for transform restoration");
+
+        for (var i = 0; i < preserveNodeTransforms.length; i++) {
+            var config = preserveNodeTransforms[i];
+            if (!config.nodeLabel || !config.savedTransforms) continue;
+
+            for (var t = 0; t < config.savedTransforms.length; t++) {
+                var entry = config.savedTransforms[t];
+                var ctrl = entry.ctrl;
+                if (!ctrl) continue;
+
+                var savedValue = entry.value;
+                var numKeys = ctrl.getNumKeys();
+                if (numKeys > 0) {
+                    for (var k = 0; k < numKeys; k++) {
+                        ctrl.setValue(ctrl.getKeyTime(k), savedValue);
+                    }
+                } else {
+                    ctrl.setValue(savedValue);
+                }
+                print("Restored transform", config.nodeLabel, entry.label, "=", savedValue, "(keys:", numKeys + ")");
+            }
+
+            print("Restored transforms for node:", config.nodeLabel);
         }
     }
 }

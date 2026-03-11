@@ -1,0 +1,132 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+// Dry-run verification of DK9_ArtDirection.json
+// Shows which absolute frames each art direction entry will land on
+// and whether the referenced nodes and properties actually exist.
+// Does NOT modify anything.
+
+var dir_self = new DzDir(new DzFileInfo(getScriptFileName()).path());
+include(dir_self.filePath("DthUtils.dsa"));
+
+function getNodeRoot(oNode) {
+    if (!oNode) return null;
+    while (oNode.getNodeParent()) {
+        oNode = oNode.getNodeParent();
+    }
+    return oNode;
+}
+
+function findNode(oNodeRoot, nodeName) {
+    if (oNodeRoot.getName() === nodeName || oNodeRoot.getLabel() === nodeName) {
+        return oNodeRoot;
+    }
+    var oNode = oNodeRoot.findNodeChild(nodeName, true);
+    if (!oNode) {
+        oNode = oNodeRoot.findNodeChildByLabel(nodeName, true);
+    }
+    return oNode;
+}
+
+function findProp(oNode, propName) {
+    var oProp = getMorphPropFromNode(oNode, propName);
+    if (!oProp) {
+        var oObj = oNode.getObject();
+        if (oObj) {
+            for (var m = 0; m < oObj.getNumModifiers(); m++) {
+                var mod = oObj.getModifier(m);
+                if (mod.getLabel() === propName || mod.getName() === propName) {
+                    if (mod.getValueChannel) oProp = mod.getValueChannel(0);
+                    if (!oProp && mod.getValueControl) oProp = mod.getValueControl();
+                    if (oProp) break;
+                }
+            }
+        }
+    }
+    return oProp;
+}
+
+// Main
+var oNode = Scene.getPrimarySelection();
+var oNodeRoot = getNodeRoot(oNode);
+if (!oNodeRoot) {
+    print("ERROR: No node selected. Select your Genesis 9 character root.");
+} else {
+    // Simulate the same startFrame calculation as DthWorkflow.dsa
+    var iRomFrames = 328; // DQS
+    print("=== DK9 Art Direction Verification (DRY RUN) ===");
+    print("Root node:", oNodeRoot.getLabel(), "(name:", oNodeRoot.getName(), ")");
+    print("");
+    print("Simulating DQS workflow...");
+    print("  JCM frames (DQS): " + iRomFrames);
+
+    // Simulate: setTotalFrames(328), then startFrame = animRange.end / timeStep = 328
+    var actualEnd = Scene.getAnimRange().end / Scene.getTimeStep();
+    print("  Current timeline end frame: " + actualEnd);
+
+    // Compute startFrame the same way DthWorkflow.dsa does
+    // After setTotalFrames(iRomFrames): startFrame = iRomFrames
+    var simulatedStart = iRomFrames;
+    print("  Simulated DK9 startFrame: " + simulatedStart);
+    print("");
+
+    // Read the JSON
+    var jsonPath = dir_self.filePath("DK9_ArtDirection.json");
+    var oFile = new DzFile(jsonPath);
+    if (!oFile.open(oFile.ReadOnly)) {
+        print("ERROR: Could not open " + jsonPath);
+    } else {
+        var sContent = oFile.read();
+        oFile.close();
+        var jsonData = JSON.parse(sContent);
+
+        print("Checking " + jsonData.frames.length + " art direction entries:");
+        print("---------------------------------------------------------------");
+
+        var allOk = true;
+
+        for (var i = 0; i < jsonData.frames.length; i++) {
+            var entry = jsonData.frames[i];
+            var absFrame = entry.frame + simulatedStart;
+            print("");
+            print("[" + entry.name + "] offset " + entry.frame + " -> absolute frame " + absFrame);
+
+            if (!entry.morphs || entry.morphs.length === 0) {
+                print("  (no morphs - will be skipped)");
+                continue;
+            }
+
+            for (var j = 0; j < entry.morphs.length; j++) {
+                var morph = entry.morphs[j];
+                var oTargetNode = findNode(oNodeRoot, morph.node);
+                var nodeStatus;
+                var propStatus;
+
+                if (!oTargetNode) {
+                    nodeStatus = "NOT FOUND";
+                    propStatus = "SKIPPED";
+                    allOk = false;
+                } else {
+                    nodeStatus = "OK (name: " + oTargetNode.getName() + ", label: " + oTargetNode.getLabel() + ")";
+                    var oProp = findProp(oTargetNode, morph.prop);
+                    if (!oProp) {
+                        propStatus = "NOT FOUND";
+                        allOk = false;
+                    } else {
+                        propStatus = "OK (name: " + oProp.getName() + ")";
+                    }
+                }
+
+                print("  node \"" + morph.node + "\": " + nodeStatus);
+                print("    prop \"" + morph.prop + "\": " + propStatus + " -> value: " + morph.value);
+            }
+        }
+
+        print("");
+        print("===============================================================");
+        if (allOk) {
+            print("RESULT: ALL nodes and properties found. Art direction JSON is valid.");
+        } else {
+            print("RESULT: SOME nodes or properties NOT FOUND. Check warnings above.");
+        }
+        print("===============================================================");
+    }
+}

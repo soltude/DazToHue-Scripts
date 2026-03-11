@@ -1,0 +1,109 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+// Scans DicktatorG9 and Genesis9 for all DK9/Anus related properties
+// Run with Genesis9 root selected in the scene
+
+var dir_self = new DzDir(new DzFileInfo(getScriptFileName()).path());
+var outPath = dir_self.filePath("DK9_Props_Scan.txt");
+
+function getNodeRoot(oNode) {
+    if (!oNode) return null;
+    while (oNode.getNodeParent()) {
+        oNode = oNode.getNodeParent();
+    }
+    return oNode;
+}
+
+function scanNodeProperties(oNode, results, filter) {
+    if (!oNode) return;
+    var nodeLabel = oNode.getLabel();
+    var nodeName = oNode.getName();
+
+    // Scan modifiers on the node's object
+    var oObj = oNode.getObject();
+    if (oObj) {
+        var nMods = oObj.getNumModifiers();
+        for (var i = 0; i < nMods; i++) {
+            var mod = oObj.getModifier(i);
+            var modName = mod.getName();
+            var modLabel = mod.getLabel();
+
+            var search = (modName + modLabel).toLowerCase();
+            var pass = !filter;
+            if (filter) {
+                var keywords = ["dk", "anus", "glute", "clench", "shaft", "scrotum",
+                    "testicle", "foreskin", "penis", "flaccid", "erect",
+                    "dicktator", "dth", "contraction"];
+                for (var k = 0; k < keywords.length; k++) {
+                    if (search.indexOf(keywords[k]) >= 0) { pass = true; break; }
+                }
+            }
+
+            if (pass) {
+                var channel = null;
+                if (mod.getValueChannel) channel = mod.getValueChannel(0);
+                if (!channel && mod.getValueControl) channel = mod.getValueControl();
+                var chanName = channel ? channel.getName() : "(no channel)";
+                results.push(nodeName + "\t" + nodeLabel + "\t" + modName + "\t" + modLabel + "\tmodifier\t" + chanName);
+            }
+        }
+    }
+}
+
+function scanNodeRecursive(oNode, results, filter, depth) {
+    if (!oNode || depth > 10) return;
+    scanNodeProperties(oNode, results, filter);
+    var nChildren = oNode.getNumNodeChildren();
+    for (var i = 0; i < nChildren; i++) {
+        scanNodeRecursive(oNode.getNodeChild(i), results, filter, depth + 1);
+    }
+}
+
+// Main
+var oNode = Scene.getPrimarySelection();
+var oNodeRoot = getNodeRoot(oNode);
+if (!oNodeRoot) {
+    print("ERROR: No node selected. Select your Genesis 9 character root and run again.");
+} else {
+    print("Root node:", oNodeRoot.getLabel(), "(name:", oNodeRoot.getName(), ")");
+
+    var results = [];
+    results.push("NodeName\tNodeLabel\tPropName\tPropLabel\tType\tChannel");
+
+    // Scan root node for DK/anus/glute related morphs (filtered)
+    print("Scanning root node for DK-related morphs...");
+    scanNodeProperties(oNodeRoot, results, true);
+
+    // Scan pelvis for glute/clench morphs (filtered)
+    var oPelvis = oNodeRoot.findNodeChild("pelvis", true);
+    if (!oPelvis) oPelvis = oNodeRoot.findNodeChildByLabel("Pelvis", true);
+    if (!oPelvis) oPelvis = oNodeRoot.findNodeChildByLabel("Hip", true);
+    if (oPelvis) {
+        print("Scanning pelvis:", oPelvis.getLabel(), "(name:", oPelvis.getName(), ")");
+        scanNodeProperties(oPelvis, results, true);
+    } else {
+        print("WARNING: pelvis/Hip node not found");
+    }
+
+    // Scan DicktatorG9 and ALL descendants (no filter - dump everything)
+    var oNodeDk9 = oNodeRoot.findNodeChildByLabel("DicktatorG9");
+    if (oNodeDk9) {
+        print("Found DicktatorG9:", oNodeDk9.getName(), "(label:", oNodeDk9.getLabel(), ")");
+        print("Scanning DicktatorG9 and all children recursively...");
+        scanNodeRecursive(oNodeDk9, results, false, 0);
+    } else {
+        print("WARNING: DicktatorG9 not found under", oNodeRoot.getLabel());
+    }
+
+    // Write output
+    var oFile = new DzFile(outPath);
+    if (oFile.open(oFile.WriteOnly)) {
+        oFile.write(results.join("\n"));
+        oFile.close();
+        print("Done. Wrote", results.length - 1, "entries to:", outPath);
+    } else {
+        print("ERROR: Could not write to", outPath);
+        for (var i = 0; i < results.length; i++) {
+            print(results[i]);
+        }
+    }
+}

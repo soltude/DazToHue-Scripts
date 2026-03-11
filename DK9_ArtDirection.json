@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "DK9 Art Direction - relative offsets from DK9 ROM start. Circumcised setup (no foreskin sections).",
+    "finalFrameFormula": "iRomFrames + frame (same as GP9, no extra offset)"
+  },
+  "frames": [
+    {
+      "frame": 48,
+      "finalFrameDQS": 376,
+      "finalFrameLinear": 665,
+      "section": "DK9",
+      "name": "PenisContraction",
+      "morphs": [
+        { "node": "Genesis9", "prop": "body_bs_FlexGluteClenchR", "value": 0.94 },
+        { "node": "Genesis9", "prop": "body_bs_FlexGluteClenchL", "value": 0.94 },
+        { "node": "DicktatorG9", "prop": "DK_Shaft_Shorten", "value": 0.1 }
+      ]
+    },
+    {
+      "frame": 50,
+      "finalFrameDQS": 378,
+      "finalFrameLinear": 667,
+      "section": "DK9",
+      "name": "AnusOpen",
+      "morphs": [
+        { "node": "Genesis9", "prop": "DK_Anus_Open1", "value": 0.67 },
+        { "node": "Genesis9", "prop": "DK_Anus_Open2", "value": 0.19 },
+        { "node": "Genesis9", "prop": "DK_Anus_Open3", "value": 0.39 }
+      ]
+    },
+    {
+      "frame": 51,
+      "finalFrameDQS": 379,
+      "finalFrameLinear": 668,
+      "section": "DK9",
+      "name": "AnusContraction",
+      "morphs": [
+        { "node": "Genesis9", "prop": "body_bs_FlexGluteClenchR", "value": 1.0 },
+        { "node": "Genesis9", "prop": "body_bs_FlexGluteClenchL", "value": 1.0 },
+        { "node": "Genesis9", "prop": "DK_Anus_Contraction", "value": 1.0 }
+      ]
+    },
+    {
+      "frame": 53,
+      "finalFrameDQS": 381,
+      "finalFrameLinear": 670,
+      "section": "DK9",
+      "name": "PenisScaleFlaccid",
+      "morphs": [
+        { "node": "DicktatorG9", "prop": "DK_Shaft_Scale1", "value": -0.5 },
+        { "node": "DicktatorG9", "prop": "DK_ShaftLength", "value": -0.5 }
+      ]
+    }
+  ]
+}
