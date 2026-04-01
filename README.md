@@ -66,7 +66,8 @@ You MUST set the value for `DTH_POSES_PATH` to point the the `DazToHue\Poses\` f
 |`bDQS`| false| set true to enable Dual Quat Skinning, defaults to linear (untested)|
 |`FACsDetailStrength`| 1.0||
 |`FlexionStrength`| 1.0||
-|`extraCSVs`|[string]|paths to FrameData CSVs|
+|`extraJSONs`|[string]|paths to FrameData JSON files|
+|`extraCSVs`|[string]|Legacy - paths to FrameData CSVs (only used by DthExportFBMs.dsa)|
 
 1. Modify DthWorkflowExample to set the options you want. You MUST set `sPathDthPoses` for your hard drive. 
 2. Make a DAZ custom action so you can invoke it. 
@@ -95,7 +96,7 @@ These can be made using DthScanFrames.dsa and edited in Excel or any spreadsheet
 
 User invokable script, needs to be modified to select CSV files to load. Not well tested.
 
-1. In the script, change `options.extraCSVs` to the CSVs you want to load. (you can use absolute paths.)
+1. In the script, change `options.extraJSONs` to the JSON files you want to load. (you can use absolute paths.)
 2. Set the total frames to 1. 
 3. Select the root Genesis9 node and any nodes which has morphs to be set (mouth, genetalia, etc.)
 4. Invoke the script. 

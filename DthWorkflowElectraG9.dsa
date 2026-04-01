@@ -1,0 +1,59 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+// DTH Workflow for Electra G9 with FBM morphs
+// Uses soltude/DazToHue-Scripts framework
+
+var dir_self = new DzDir(new DzFileInfo(getScriptFileName()).path());
+include(dir_self.filePath("DthWorkflow.dsa"));
+
+// Override default options for Electra G9 workflow
+options.bIncludeJCM = true;
+options.bIncludeFAC = true;
+options.bIncludeDK = false;
+options.bIncludeGP = true;   // Golden Palace ROM (~103 frames)
+options.bDQS = true;         // DQS mode = 328 base frames
+
+// Add FBM morphs JSON
+options.extraJSONs = [
+    dir_self.filePath("ElectraG9_FBMs.json")
+];
+
+// Preserve Electra's breast position after ROM loading
+options.preserveMorphs = [
+    { name: "body_ctrl_BreastsUp-Down", keepValue: 0.6 }
+];
+
+// Preserve eye transforms after ROM loading (memorized before ROMs, restored after)
+/*options.preserveNodeTransforms = [
+    { nodeLabel: "Left Eye" },
+    { nodeLabel: "Right Eye" }
+];*/
+
+// JCM morph modifications - drive morphs proportionally to bone rotation
+/*options.jcmMorphMods = [
+    {
+        boneLabel: "Left Thigh",
+        axis: "XRotate",
+        positive: [],
+        negative: [
+            { morphName: "SL_Glutes SS Left",
+              range: { angle: { start: 0, end: -115 }, value: { start: 0, end: 0.33 } } },
+            { morphName: "SL_Glutes Up_Down Left",
+              range: { angle: { start: 0, end: -115 }, value: { start: 0, end: 0.33 } } }
+        ]
+    },
+    {
+        boneLabel: "Right Thigh",
+        axis: "XRotate",
+        positive: [],
+        negative: [
+            { morphName: "SL_Glutes SS Right",
+              range: { angle: { start: 0, end: -115 }, value: { start: 0, end: 0.33 } } },
+            { morphName: "SL_Glutes Up_Down Right",
+              range: { angle: { start: 0, end: -115 }, value: { start: 0, end: 0.33 } } }
+        ]
+    }
+];*/
+
+// Run the workflow
+ApplyDTHWorkflow(options);

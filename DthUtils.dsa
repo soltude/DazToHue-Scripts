@@ -20,10 +20,18 @@ function setLinearInterp(oNodes, startFrame, endFrame){
  	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
  	endFrame = typeof endFrame !== 'undefined' ? endFrame : 0;
 	var props = [];
+
+	// Properties to skip (transforms should never be touched)
+	var skipProps = ["Scale", "XScale", "YScale", "ZScale",
+					 "XRotate", "YRotate", "ZRotate",
+					 "XTranslate", "YTranslate", "ZTranslate",
+					 "General Scale", "X Scale", "Y Scale", "Z Scale"];
+
 	for(var x = 0; x < oNodes.length; x++)
 	{
 		var oNode = oNodes[x];
 		var oObj = oNode.getObject();
+		// Only process morph modifiers, NOT node properties (which include Scale/Transform)
 		if(oObj){
 			for(var i=0; i<oObj.getNumModifiers(); i++)
 			{
@@ -37,21 +45,15 @@ function setLinearInterp(oNodes, startFrame, endFrame){
 					}
 				}
 			}
-		}	
-		oNode.getPropertyList().forEach( function(oProp){
-			if (oProp.getNumKeys() > 1) {	
-				props.push(oProp)
-			}	
-		});	
+		}
+		// Skip node properties entirely - they include Scale/Transform which should never be modified
 	}
-	print("Props and morphs:", props.length)
+	print("Morph props to set linear interp:", props.length)
 	for( var i = 0; i < props.length; i++){
 		var oProp = props[i];
 		for( var j = 0; j < oProp.getNumKeys(); j++) {
-			var keyTime = oProp.getKeyTime(j);
+			// Only set interpolation type - do NOT call setValue as it can modify values
 			oProp.setKeyInterpolationType(j, DzFloatProperty.LINEAR_INTERP);
-			oProp.setValue(keyTime, oProp.getValue(keyTime) , DzFloatProperty.LINEAR_INTERP );
-			print("Set interp to linear for", oProp.getLabel(), j, oProp.getKeyInterpolationType(j));
 		}
 	}
 }
@@ -194,7 +196,7 @@ function readPropsCSV(sFilename, frameDatas, iOffset){
 	          		var keyData = { frameIdx:  frameNum,
 									nodeName:  row[j],
 									propName:  row[j+1],
-									propValue: row[j+2] };
+									propValue: parseFloat(row[j+2]) };
 					addFrameData(frameDatas, keyData);
 					verbose("add frame data. frame:",frameNum, "prop:", row[j+1]);
 	          	}
@@ -208,6 +210,142 @@ function readPropsCSV(sFilename, frameDatas, iOffset){
 	{
 		print("ERROR: could not find or open file:", sFilename);
 	}
+	return frameDatas;
+}
+
+// Reads frame data from JSON file format
+// JSON format:
+// {
+//   "meta": { "version": "1.0", "description": "..." },
+//   "frames": [
+//     {
+//       "frame": 100,  // Relative frame offset (added to iOffset)
+//       "section": "GP9",
+//       "name": "Anus_Open",
+//       "morphs": [
+//         { "node": "GoldenPalace_G9", "prop": "GP9_Anus_Open", "value": 1.0 },
+//         { "node": "GoldenPalace_G9", "prop": "GP9_Anus_Depth", "value": 0.5, "base": 0.2 }
+//       ]
+//     }
+//   ]
+// }
+function readFrameDataJSON(sFilename, frameDatas, iOffset){
+	frameDatas = frameDatas || [];
+	iOffset = iOffset || 0;
+
+	var oFile = new DzFile(sFilename);
+	if (!oFile.open(oFile.ReadOnly)) {
+		print("ERROR: could not find or open file:", sFilename);
+		return frameDatas;
+	}
+
+	var sContent = oFile.read();
+	oFile.close();
+
+	var jsonData;
+	try {
+		jsonData = JSON.parse(sContent);
+	} catch (e) {
+		print("ERROR: failed to parse JSON from:", sFilename, "-", e);
+		return frameDatas;
+	}
+
+	if (!jsonData.frames || !Array.isArray(jsonData.frames)) {
+		print("ERROR: JSON file missing 'frames' array:", sFilename);
+		return frameDatas;
+	}
+
+	// Handle resetGPBeforeApplying - reset GP morphs at FBM start to prevent leakage
+	if (jsonData.meta && jsonData.meta.resetGPBeforeApplying === true) {
+		var oFileInfo = new DzFileInfo(sFilename);
+		var gpJsonPath = oFileInfo.path() + "/GP9_ArtDirection.json";
+
+		var gpFile = new DzFile(gpJsonPath);
+		if (gpFile.open(gpFile.ReadOnly)) {
+			var gpContent = gpFile.read();
+			gpFile.close();
+
+			try {
+				var gpData = JSON.parse(gpContent);
+				if (gpData.frames && gpData.frames.length > 0) {
+					// Find the last frame (highest frame number)
+					var lastFrame = null;
+					var maxFrameNum = -1;
+					for (var g = 0; g < gpData.frames.length; g++) {
+						var gf = gpData.frames[g];
+						if (parseInt(gf.frame) > maxFrameNum) {
+							maxFrameNum = parseInt(gf.frame);
+							lastFrame = gf;
+						}
+					}
+
+					if (lastFrame && lastFrame.morphs && lastFrame.morphs.length > 0) {
+						// Find minimum frame in this FBM JSON for reset point
+						var minFrame = Number.MAX_VALUE;
+						for (var f = 0; f < jsonData.frames.length; f++) {
+							var fn = parseInt(jsonData.frames[f].frame);
+							if (fn < minFrame) minFrame = fn;
+						}
+						var firstFrameNum = minFrame + iOffset;
+
+						// Add reset keyDatas for each morph from GP last frame
+						// Use noSawtooth flag to prevent overwriting the previous frame's value
+						for (var m = 0; m < lastFrame.morphs.length; m++) {
+							var gpMorph = lastFrame.morphs[m];
+							var keyData = {
+								frameIdx: firstFrameNum,
+								nodeName: gpMorph.node,
+								propName: gpMorph.prop,
+								propValue: 0,
+								baseValue: 0,
+								noSawtooth: true  // Don't use sawtooth pattern for reset
+							};
+							addFrameData(frameDatas, keyData);
+							verbose("Reset GP morph before applying:", gpMorph.prop, "at frame", firstFrameNum);
+						}
+						print("Reset", lastFrame.morphs.length, "GP morphs from frame", lastFrame.name, "at FBM start frame", firstFrameNum);
+					} else {
+						print("WARNING: GP9 last frame has no morphs defined - nothing to reset");
+					}
+				}
+			} catch (e) {
+				print("ERROR: Failed to parse GP9_ArtDirection.json:", e);
+			}
+		} else {
+			print("WARNING: Could not open GP9_ArtDirection.json at:", gpJsonPath);
+		}
+	}
+
+	var frameCount = 0;
+	for (var i = 0; i < jsonData.frames.length; i++) {
+		var frameEntry = jsonData.frames[i];
+		var frameNum = parseInt(frameEntry.frame) + iOffset;
+
+		if (!frameDatas[frameNum]) {
+			frameDatas[frameNum] = {
+				keyDatas: [],
+				sectionName: frameEntry.section || "",
+				frameName: frameEntry.name || ""
+			};
+		}
+
+		if (frameEntry.morphs && Array.isArray(frameEntry.morphs)) {
+			for (var j = 0; j < frameEntry.morphs.length; j++) {
+				var morph = frameEntry.morphs[j];
+				var keyData = {
+					frameIdx: frameNum,
+					nodeName: morph.node,
+					propName: morph.prop,
+					propValue: parseFloat(morph.value),
+					baseValue: (morph.base !== undefined) ? parseFloat(morph.base) : 0
+				};
+				addFrameData(frameDatas, keyData);
+				verbose("add JSON frame data. frame:", frameNum, "prop:", morph.prop, "base:", keyData.baseValue);
+			}
+		}
+		frameCount++;
+	}
+	print("added", frameCount, "JSON frames from:", sFilename);
 	return frameDatas;
 }
 
@@ -295,6 +433,60 @@ function createMorphFrames( oNode, morphConfigs, iStartFrame){
 }
 
 
+// Reset all morphs in frameDatas to 0 at a specific frame (typically frame 0)
+// This preserves the base state and prevents interpolation issues
+function resetFrameDatasAtFrame(oNodeRoot, frameDatas, resetFrame){
+	resetFrame = resetFrame || 0;
+	var timeStep = Scene.getTimeStep();
+	var processedProps = {}; // Track which props we've already reset
+
+	for(var i = 0; i < frameDatas.length; i++){
+		var frameData = frameDatas[i];
+		if(frameData && frameData.keyDatas){
+			for(var j = 0; j < frameData.keyDatas.length; j++){
+				var keyData = frameData.keyDatas[j];
+				if(!keyData.propName || processedProps[keyData.propName]) continue;
+
+				// Find the node
+				var oNode;
+				if(oNodeRoot.getName() == keyData.nodeName || oNodeRoot.getLabel() == keyData.nodeName)
+					oNode = oNodeRoot;
+				else
+					oNode = oNodeRoot.findNodeChild(keyData.nodeName, true);
+				if(!oNode)
+					oNode = oNodeRoot.findNodeChildByLabel(keyData.nodeName, true);
+
+				if(oNode){
+					// Find the property (same logic as applyKeyData)
+					var oProp = getMorphPropFromNode(oNode, keyData.propName);
+					if(!oProp){
+						var oObj = oNode.getObject();
+						if(oObj){
+							for(var m = 0; m < oObj.getNumModifiers(); m++){
+								var mod = oObj.getModifier(m);
+								if(mod.getLabel() === keyData.propName || mod.getName() === keyData.propName){
+									if(mod.getValueChannel) oProp = mod.getValueChannel(0);
+									if(!oProp && mod.getValueControl) oProp = mod.getValueControl();
+									if(oProp) break;
+								}
+							}
+						}
+					}
+
+					if(oProp){
+						// Set to 0 at reset frame
+						oProp.setValue(resetFrame * timeStep, 0);
+						processedProps[keyData.propName] = true;
+						verbose("Reset", keyData.propName, "to 0 at frame", resetFrame);
+					}
+				}
+			}
+		}
+	}
+	print("Reset", Object.keys(processedProps).length, "morphs to 0 at frame", resetFrame);
+}
+
+
 function applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDatas, startFrame)
 {
 
@@ -303,7 +495,7 @@ function applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDa
 
 	var successFrameDatas = successFrameDatas || [];
 	var failedFrameDatas = failedFrameDatas || [];
-	if(Scene.getAnimRange().end < frameDatas.length)
+	if(Scene.getAnimRange().end / Scene.getTimeStep() < frameDatas.length)
 		setTotalFrames(frameDatas.length);
 	for(var i = startFrame; i < frameDatas.length; i++){
 		verbose("  applying frame:", i);
@@ -329,24 +521,77 @@ function applyKeyData(oNodeRoot, keyData, overrideFrameIdx){
 		print("ERROR: cannot call applyKeyData; missing paramters. ");
 		return false;
 	}
-	verbose("Creating morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
+	print("Creating morph frame on", keyData.nodeName, "prop:", keyData.propName, "value:", keyData.propValue);
 	var oNode;
-	if(oNodeRoot.getName() == keyData.nodeName)
+	// Try matching by name or label
+	if(oNodeRoot.getName() == keyData.nodeName || oNodeRoot.getLabel() == keyData.nodeName)
 		oNode = oNodeRoot;
 	else
 		oNode = oNodeRoot.findNodeChild(keyData.nodeName, true);
+	if(!oNode)
+		oNode = oNodeRoot.findNodeChildByLabel(keyData.nodeName, true);
 	if(oNode){
-		var oProp = oNode.findProperty(keyData.propName);
-		if(!oProp){
-			oProp = getMorphPropFromNode(oNode, keyData.propName);
+		print("  Node found:", oNode.getName(), "/ Label:", oNode.getLabel());
+		var oProp = null;
+
+		// FIRST: Try modifier lookup (most reliable for morphs)
+		oProp = getMorphPropFromNode(oNode, keyData.propName);
+		if(oProp){
+			print("  Found via getMorphPropFromNode");
 		}
+
+		// SECOND: Loop through all modifiers and check by label/name
+		if(!oProp){
+			var oObj = oNode.getObject();
+			if(oObj){
+				for(var m = 0; m < oObj.getNumModifiers(); m++){
+					var mod = oObj.getModifier(m);
+					if(mod.getLabel() === keyData.propName || mod.getName() === keyData.propName){
+						// Try different methods to get the value property
+						if(mod.getValueChannel){
+							oProp = mod.getValueChannel(0);
+						}
+						if(!oProp && mod.getValueControl){
+							oProp = mod.getValueControl();
+						}
+						if(!oProp && mod.getChannel){
+							oProp = mod.getChannel(0);
+						}
+						if(oProp){
+							print("  Found via modifier loop by label/name:", keyData.propName);
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		// LAST RESORT: Try node property lookup (for non-morph properties like poses)
+		if(!oProp){
+			oProp = oNode.findProperty(keyData.propName);
+			if(oProp) print("  Found via findProperty (fallback)");
+		}
+		if(!oProp){
+			oProp = oNode.findPropertyByLabel(keyData.propName);
+			if(oProp) print("  Found via findPropertyByLabel (fallback)");
+		}
+
 		if(oProp){
 			//var iKey = oProp.getNumKeys();
 			//*********** Main action - create the morph frame;
 			// if(createMorphFrameByKey(oProp, keyData.frameIdx, keyData.propValue, iKey)){
 			var frameIdx = overrideFrameIdx == undefined ? keyData.frameIdx : overrideFrameIdx;
+			var baseValue = (keyData.baseValue !== undefined) ? keyData.baseValue : 0;
 
-			if(createMorphFrame(oProp, frameIdx, keyData.propValue)){
+			// Check for noSawtooth flag - just set value at this frame without affecting adjacent frames
+			if (keyData.noSawtooth) {
+				var timeStep = Scene.getTimeStep();
+				oProp.setValue(frameIdx * timeStep, keyData.propValue);
+				verbose("Set value (no sawtooth) on", keyData.nodeName, "prop:", keyData.propName, "=", keyData.propValue, "at frame", frameIdx);
+				return true;
+			}
+
+			if(createMorphFrame(oProp, frameIdx, keyData.propValue, baseValue)){
 				verbose("Successfully created morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
 				return true;
 			}
@@ -403,32 +648,33 @@ function createMorphFrameByKey( oProperty, iFrame, fValue, iKey){
 }
 
 /** **************************************************************************/
-function createMorphFrame( oProperty, iFrame, fValue ){
+// Creates a sawtooth keyframe pattern: adjacent frames are set to fBaseValue,
+// target frame is set to fValue. This prevents morph value leakage.
+// fBaseValue defaults to 0 if not specified.
+function createMorphFrame( oProperty, iFrame, fValue, fBaseValue ){
 	if( !oProperty ){
 		print("Error: Property is null.");
-		return false;	
+		return false;
 	}
 	if( !oProperty.inherits("DzFloatProperty")){
-		print("Error: Property is not a DzFloatProperty.");		
-		return false;	
+		print("Error: Property is not a DzFloatProperty.");
+		return false;
 	}
-		verbose("Property: " + oProperty.getLabel() );
+	// Default base value to 0 for true sawtooth anchoring
+	fBaseValue = (fBaseValue !== undefined) ? fBaseValue : 0;
+
+	verbose("Property: " + oProperty.getLabel() );
 	var timeStep = Scene.getTimeStep();
 	var tTarget = iFrame * timeStep;
 	var tPrev = iFrame * timeStep - timeStep;
 	var tNext = iFrame * timeStep + timeStep;
-	var fPrevValue = oProperty.getValue(tPrev);
-	var fNextValue = oProperty.getValue(tNext);
-		
-	//Set the target frame to new value		
-	// if (tPrev > 0){
-		oProperty.setValue(tPrev, fPrevValue);
-		verbose("Property ", oProperty.getLabel(), " set at frame ", tPrev/timeStep, "to", fPrevValue);
-	// }
-	// if (iFrame + 1 < Scene.getAnimRange().end){
-		oProperty.setValue(tNext, fNextValue);
-		verbose("Property ", oProperty.getLabel(), " set at frame ", tNext/timeStep, " to ", fNextValue);
-	// }
+
+	// Set adjacent frames to base value (not interpolated value) for true sawtooth
+	oProperty.setValue(tPrev, fBaseValue);
+	verbose("Property ", oProperty.getLabel(), " set at frame ", tPrev/timeStep, "to", fBaseValue);
+	oProperty.setValue(tNext, fBaseValue);
+	verbose("Property ", oProperty.getLabel(), " set at frame ", tNext/timeStep, " to ", fBaseValue);
+	// Set target frame to the desired value
 	oProperty.setValue(tTarget, fValue);
 	verbose("Set morph frame for", oProperty.getLabel(), "at frame", iFrame, "to value", fValue);
 	return true;
@@ -524,5 +770,529 @@ function triggerAction( sActionName , oSettings)
 
 
 function approx_eq(fValue1, fValue2){
-	return Math.abs(fValue1 - fValue2) < EPSILON;	
+	return Math.abs(fValue1 - fValue2) < EPSILON;
+}
+
+// Selects one or more nodes for action-based operations (e.g. Object Memorize/Restore)
+// oNodes can be a single DzNode or an array of DzNodes
+function selectNodes(oNodes) {
+    Scene.selectAllNodes(false);
+    if (!Array.isArray(oNodes)) {
+        oNodes = [oNodes];
+    }
+    for (var i = 0; i < oNodes.length; i++) {
+        if (oNodes[i]) {
+            oNodes[i].select(true);
+        }
+    }
+}
+
+// Scans all 10 transform controls on a node for keyframes
+// Returns sorted array of unique frame numbers (excluding frame 0)
+function getTransformKeyframes(oNode) {
+    var timeStep = Scene.getTimeStep();
+    var frameMap = {};
+    var controls = [
+        oNode.getXPosControl(), oNode.getYPosControl(), oNode.getZPosControl(),
+        oNode.getXRotControl(), oNode.getYRotControl(), oNode.getZRotControl(),
+        oNode.getScaleControl(),
+        oNode.getXScaleControl(), oNode.getYScaleControl(), oNode.getZScaleControl()
+    ];
+
+    for (var c = 0; c < controls.length; c++) {
+        var ctrl = controls[c];
+        if (!ctrl) continue;
+        for (var k = 0; k < ctrl.getNumKeys(); k++) {
+            var frame = Math.round(ctrl.getKeyTime(k) / timeStep);
+            if (frame > 0) {
+                frameMap[frame] = true;
+            }
+        }
+    }
+
+    var frames = [];
+    for (var f in frameMap) {
+        frames.push(parseInt(f));
+    }
+    frames.sort(function(a, b) { return a - b; });
+    return frames;
+}
+
+// Restores morphs specified in options.preserveMorphs to their keepValue
+// preserveMorphs format: [{ name: "body_ctrl_BreastsUp-Down", keepValue: 1 }, ...]
+function restorePreservedMorphs(oNodeRoot, preserveMorphs) {
+    if (!preserveMorphs || preserveMorphs.length === 0) {
+        return;
+    }
+
+    for (var i = 0; i < preserveMorphs.length; i++) {
+        var config = preserveMorphs[i];
+        if (!config.name) continue;
+
+        var oProp = oNodeRoot.findProperty(config.name);
+        if (!oProp) {
+            oProp = oNodeRoot.findPropertyByLabel(config.name);
+        }
+        if (!oProp) {
+            oProp = getMorphPropFromNode(oNodeRoot, config.name);
+        }
+
+        if (oProp) {
+            // Set all keyframes to keepValue (flattens the animation to constant)
+            var numKeys = oProp.getNumKeys();
+            if (numKeys > 0) {
+                for (var k = 0; k < numKeys; k++) {
+                    var keyTime = oProp.getKeyTime(k);
+                    oProp.setValue(keyTime, config.keepValue);
+                }
+            } else {
+                oProp.setValue(config.keepValue);
+            }
+            print("Restored preserved morph:", config.name, "to", config.keepValue);
+        } else {
+            print("WARNING: Could not find preserved morph:", config.name);
+        }
+    }
+}
+
+// Returns the rotation control for a bone node given an axis string.
+// axis: "XRotate", "YRotate", or "ZRotate"
+function getRotationControl(oNode, axis) {
+    if (axis === "XRotate") return oNode.getXRotControl();
+    if (axis === "YRotate") return oNode.getYRotControl();
+    if (axis === "ZRotate") return oNode.getZRotControl();
+    print("WARNING: Unknown rotation axis:", axis);
+    return null;
+}
+
+// Pre-resolves morph property references for a list of morph entries.
+// Handles "!" prefix for controller properties vs morph modifiers.
+// Returns array of { oProp, range, morphName }.
+function resolveMorphProps(oNodeRoot, morphEntries) {
+    var resolved = [];
+    for (var i = 0; i < morphEntries.length; i++) {
+        var entry = morphEntries[i];
+        var name = entry.morphName;
+        var oProp = null;
+
+        if (name.charAt(0) === "!") {
+            // Controller property - strip prefix and find via findProperty/findPropertyByLabel
+            var ctrlName = name.substring(1);
+            oProp = oNodeRoot.findProperty(ctrlName);
+            if (!oProp) {
+                oProp = oNodeRoot.findPropertyByLabel(ctrlName);
+            }
+        } else {
+            // Morph modifier - try getMorphPropFromNode first, then fallback
+            oProp = getMorphPropFromNode(oNodeRoot, name);
+
+            // Loop through all modifiers and check by label/name
+            if (!oProp) {
+                var oObj = oNodeRoot.getObject();
+                if (oObj) {
+                    for (var m = 0; m < oObj.getNumModifiers(); m++) {
+                        var mod = oObj.getModifier(m);
+                        if (mod.getLabel() === name || mod.getName() === name) {
+                            if (mod.getValueChannel) {
+                                oProp = mod.getValueChannel(0);
+                            }
+                            if (!oProp && mod.getValueControl) {
+                                oProp = mod.getValueControl();
+                            }
+                            if (!oProp && mod.getChannel) {
+                                oProp = mod.getChannel(0);
+                            }
+                            if (oProp) break;
+                        }
+                    }
+                }
+            }
+
+            if (!oProp) {
+                oProp = oNodeRoot.findProperty(name);
+            }
+            if (!oProp) {
+                oProp = oNodeRoot.findPropertyByLabel(name);
+            }
+        }
+
+        if (oProp) {
+            resolved.push({ oProp: oProp, range: entry.range, morphName: name });
+        } else {
+            print("WARNING: Could not resolve morph property:", name);
+        }
+    }
+    return resolved;
+}
+
+// Applies interpolated morph values based on bone rotation angle.
+// Linear interpolation from angle range to value range, clamped.
+// Returns count of morphs applied.
+function applyMorphModEntries(resolvedEntries, angle, keyTime) {
+    var count = 0;
+    for (var i = 0; i < resolvedEntries.length; i++) {
+        var entry = resolvedEntries[i];
+        var aStart = entry.range.angle.start;
+        var aEnd = entry.range.angle.end;
+        var vStart = entry.range.value.start;
+        var vEnd = entry.range.value.end;
+
+        // Clamp angle to the range
+        var clampedAngle;
+        if (aStart < aEnd) {
+            clampedAngle = Math.max(aStart, Math.min(aEnd, angle));
+        } else {
+            clampedAngle = Math.min(aStart, Math.max(aEnd, angle));
+        }
+
+        // Linear interpolation: map angle to value
+        var t = (aEnd !== aStart) ? (clampedAngle - aStart) / (aEnd - aStart) : 0;
+        var value = vStart + t * (vEnd - vStart);
+
+        entry.oProp.setValue(keyTime, value);
+        verbose("  JcmMorphMod:", entry.morphName, "angle:", angle, "-> value:", value);
+        count++;
+    }
+    return count;
+}
+
+// Resets morphs that are exclusive to sourceEntries (not in otherEntries) to 0.
+// This prevents morphs from one direction lingering when rotation crosses zero.
+function resetExclusiveMorphs(sourceEntries, otherEntries, keyTime) {
+    for (var i = 0; i < sourceEntries.length; i++) {
+        var isShared = false;
+        for (var j = 0; j < otherEntries.length; j++) {
+            if (sourceEntries[i].morphName === otherEntries[j].morphName) {
+                isShared = true;
+                break;
+            }
+        }
+        if (!isShared) {
+            sourceEntries[i].oProp.setValue(keyTime, 0);
+            verbose("  Reset exclusive morph:", sourceEntries[i].morphName, "to 0");
+        }
+    }
+}
+
+// Main function: applies JCM morph modifications based on bone rotation keyframes.
+// Reads rotation keyframes from bones specified in jcmMorphMods config,
+// then sets morph values proportionally using linear interpolation.
+function applyJcmMorphMods(oNodeRoot, jcmMorphMods) {
+    if (!jcmMorphMods || jcmMorphMods.length === 0) {
+        return;
+    }
+
+    var timeStep = Scene.getTimeStep();
+
+    for (var i = 0; i < jcmMorphMods.length; i++) {
+        var config = jcmMorphMods[i];
+        var oNode = oNodeRoot.findNodeChildByLabel(config.boneLabel, true);
+        if (!oNode) {
+            oNode = oNodeRoot.findNodeChild(config.boneLabel, true);
+        }
+        if (!oNode) {
+            print("WARNING: Could not find bone node:", config.boneLabel);
+            continue;
+        }
+
+        var rotCtrl = getRotationControl(oNode, config.axis);
+        if (!rotCtrl) {
+            print("WARNING: Could not get rotation control for", config.boneLabel, config.axis);
+            continue;
+        }
+
+        // Pre-resolve morph properties
+        var posEntries = resolveMorphProps(oNodeRoot, config.positive || []);
+        var negEntries = resolveMorphProps(oNodeRoot, config.negative || []);
+
+        var numKeys = rotCtrl.getNumKeys();
+        print("Processing", numKeys, "rotation keyframes on", config.boneLabel, config.axis);
+
+        for (var k = 0; k < numKeys; k++) {
+            var keyTime = rotCtrl.getKeyTime(k);
+            var angle = rotCtrl.getKeyValue(k);
+
+            if (approx_eq(angle, 0)) {
+                // Angle is ~0: reset all morphs to 0
+                for (var p = 0; p < posEntries.length; p++) {
+                    posEntries[p].oProp.setValue(keyTime, 0);
+                }
+                for (var n = 0; n < negEntries.length; n++) {
+                    negEntries[n].oProp.setValue(keyTime, 0);
+                }
+            } else if (angle > 0) {
+                applyMorphModEntries(posEntries, angle, keyTime);
+                resetExclusiveMorphs(negEntries, posEntries, keyTime);
+            } else {
+                applyMorphModEntries(negEntries, angle, keyTime);
+                resetExclusiveMorphs(posEntries, negEntries, keyTime);
+            }
+        }
+
+        print("Applied JCM morph modifications for", config.boneLabel, config.axis,
+              "- positive morphs:", posEntries.length, "negative morphs:", negEntries.length);
+    }
+}
+
+// Memorizes transform properties for nodes listed in preserveNodeTransforms before ROM loading.
+// Uses DAZ's Object Memorize action (DzMemorizeSelectedItemsAction) to store current transforms
+// as defaults, with direct accessor save as fallback data.
+// preserveNodeTransforms format: [{ nodeLabel: "Left Eye" }, ...]
+function memorizeNodeTransforms(oNodeRoot, preserveNodeTransforms) {
+    if (!preserveNodeTransforms || preserveNodeTransforms.length === 0) {
+        return;
+    }
+
+    var resolvedNodes = [];
+    for (var i = 0; i < preserveNodeTransforms.length; i++) {
+        var config = preserveNodeTransforms[i];
+        if (!config.nodeLabel) continue;
+
+        var oNode = oNodeRoot.findNodeChildByLabel(config.nodeLabel, true);
+        if (!oNode) {
+            print("WARNING: Could not find node for transform memorize:", config.nodeLabel);
+            continue;
+        }
+
+        config._node = oNode;
+        resolvedNodes.push(oNode);
+
+        // Save transform values via direct accessors (fallback data)
+        var controls = [
+            { label: "XTranslate", ctrl: oNode.getXPosControl() },
+            { label: "YTranslate", ctrl: oNode.getYPosControl() },
+            { label: "ZTranslate", ctrl: oNode.getZPosControl() },
+            { label: "XRotate",    ctrl: oNode.getXRotControl() },
+            { label: "YRotate",    ctrl: oNode.getYRotControl() },
+            { label: "ZRotate",    ctrl: oNode.getZRotControl() },
+            { label: "Scale",      ctrl: oNode.getScaleControl() },
+            { label: "XScale",    ctrl: oNode.getXScaleControl() },
+            { label: "YScale",    ctrl: oNode.getYScaleControl() },
+            { label: "ZScale",    ctrl: oNode.getZScaleControl() }
+        ];
+
+        config.savedTransforms = [];
+        for (var t = 0; t < controls.length; t++) {
+            var ctrl = controls[t].ctrl;
+            if (ctrl) {
+                config.savedTransforms.push({
+                    label: controls[t].label,
+                    ctrl: ctrl,
+                    value: ctrl.getValue()
+                });
+                verbose("Saved transform", config.nodeLabel, controls[t].label, "=", ctrl.getValue());
+            }
+        }
+        print("Saved", config.savedTransforms.length, "transforms for node:", config.nodeLabel);
+    }
+
+    // Select all target nodes and memorize them via Object Memorize action
+    if (resolvedNodes.length > 0) {
+        Scene.setTime(0);
+        selectNodes(resolvedNodes);
+        config._useActions = triggerAction("DzMemorizeSelectedItemsAction");
+        if (config._useActions) {
+            print("Discovered Object Memorize/Restore actions - will use action-based restore");
+        } else {
+            print("WARNING: DzMemorizeSelectedItemsAction not available - will use fallback restore");
+        }
+    }
+}
+
+// Restores transform properties for nodes listed in preserveNodeTransforms after ROM loading.
+// Primary path: uses DAZ Object Memorize/Restore actions (matching the manual workflow).
+// Fallback path: uses direct setValue on all keyframes (if actions not available).
+function restoreNodeTransforms(oNodeRoot, preserveNodeTransforms) {
+    if (!preserveNodeTransforms || preserveNodeTransforms.length === 0) {
+        return;
+    }
+
+    var timeStep = Scene.getTimeStep();
+
+    // Check if action-based restore is available (set by memorizeNodeTransforms)
+    var useActions = false;
+    for (var i = 0; i < preserveNodeTransforms.length; i++) {
+        if (preserveNodeTransforms[i]._useActions) {
+            useActions = true;
+            break;
+        }
+    }
+
+    if (useActions) {
+        // === ACTION-BASED RESTORE (primary path) ===
+        print("Using action-based Object Memorize/Restore for transform restoration");
+
+        // Step 1: Collect resolved nodes
+        var resolvedNodes = [];
+        for (var i = 0; i < preserveNodeTransforms.length; i++) {
+            var config = preserveNodeTransforms[i];
+            if (!config.nodeLabel) continue;
+            var oNode = config._node || oNodeRoot.findNodeChildByLabel(config.nodeLabel, true);
+            if (!oNode) continue;
+            resolvedNodes.push(oNode);
+        }
+
+        // Step 2: At frame 0, restore memorized transforms (captured before ROM loading)
+        Scene.setTime(0);
+        selectNodes(resolvedNodes);
+        triggerAction("DzRestoreSelectedItemsAction");
+        print("Restored memorized transforms at frame 0");
+
+        // Step 3: Memorize Figure (captures corrected frame 0 as figure defaults)
+        Scene.selectAllNodes(false);
+        oNodeRoot.select(true);
+        Scene.setPrimarySelection(oNodeRoot);
+        triggerAction("DzMemorizeFigureAction");
+        print("Memorized figure for root node at frame 0");
+
+        // Step 4: Scan keyframes on all target nodes' transform controls
+        var allFrames = {};
+        for (var i = 0; i < preserveNodeTransforms.length; i++) {
+            var config = preserveNodeTransforms[i];
+            var oNode = config._node || oNodeRoot.findNodeChildByLabel(config.nodeLabel, true);
+            if (!oNode) continue;
+
+            var nodeFrames = getTransformKeyframes(oNode);
+            for (var f = 0; f < nodeFrames.length; f++) {
+                allFrames[nodeFrames[f]] = true;
+            }
+        }
+
+        var frameList = [];
+        for (var f in allFrames) {
+            frameList.push(parseInt(f));
+        }
+        frameList.sort(function(a, b) { return a - b; });
+
+        print("Restoring transforms at", frameList.length, "frames:", frameList.join(", "));
+
+        // Step 5: Select all target nodes, then restore at each keyframe
+        selectNodes(resolvedNodes);
+        for (var f = 0; f < frameList.length; f++) {
+            Scene.setTime(frameList[f] * timeStep);
+            triggerAction("DzRestoreSelectedItemsAction");
+            verbose("Restored selected items at frame", frameList[f]);
+        }
+
+        print("Action-based transform restoration complete");
+
+    } else {
+        // === FALLBACK PATH (direct setValue) ===
+        print("Using fallback direct setValue for transform restoration");
+
+        for (var i = 0; i < preserveNodeTransforms.length; i++) {
+            var config = preserveNodeTransforms[i];
+            if (!config.nodeLabel || !config.savedTransforms) continue;
+
+            for (var t = 0; t < config.savedTransforms.length; t++) {
+                var entry = config.savedTransforms[t];
+                var ctrl = entry.ctrl;
+                if (!ctrl) continue;
+
+                var savedValue = entry.value;
+                var numKeys = ctrl.getNumKeys();
+                if (numKeys > 0) {
+                    for (var k = 0; k < numKeys; k++) {
+                        ctrl.setValue(ctrl.getKeyTime(k), savedValue);
+                    }
+                } else {
+                    ctrl.setValue(savedValue);
+                }
+                print("Restored transform", config.nodeLabel, entry.label, "=", savedValue, "(keys:", numKeys + ")");
+            }
+
+            print("Restored transforms for node:", config.nodeLabel);
+        }
+    }
+}
+
+// Applies GP art direction morphs from GP9_ArtDirection.json to the GP ROM frames
+// sJsonPath: path to GP9_ArtDirection.json
+// oNodeRoot: root node (Genesis9)
+// startFrame: frame where GP ROM starts (e.g., 328 for DQS)
+function applyGPArtDirection(sJsonPath, oNodeRoot, startFrame) {
+    var oFile = new DzFile(sJsonPath);
+    if (!oFile.open(oFile.ReadOnly)) {
+        print("WARNING: Could not open GP art direction file:", sJsonPath);
+        return false;
+    }
+
+    var sContent = oFile.read();
+    oFile.close();
+
+    var jsonData;
+    try {
+        jsonData = JSON.parse(sContent);
+    } catch (e) {
+        print("ERROR: Failed to parse GP art direction JSON:", e);
+        return false;
+    }
+
+    if (!jsonData.frames || !Array.isArray(jsonData.frames)) {
+        print("ERROR: GP art direction JSON missing 'frames' array");
+        return false;
+    }
+
+    var timeStep = Scene.getTimeStep();
+    var appliedCount = 0;
+
+    for (var i = 0; i < jsonData.frames.length; i++) {
+        var frameEntry = jsonData.frames[i];
+        var absoluteFrame = parseInt(frameEntry.frame) + startFrame;
+
+        if (!frameEntry.morphs || frameEntry.morphs.length === 0) {
+            continue;
+        }
+
+        print("Applying GP art direction for", frameEntry.name, "at frame", absoluteFrame);
+
+        for (var j = 0; j < frameEntry.morphs.length; j++) {
+            var morph = frameEntry.morphs[j];
+
+            // Find the node
+            var oNode;
+            if (oNodeRoot.getName() === morph.node || oNodeRoot.getLabel() === morph.node) {
+                oNode = oNodeRoot;
+            } else {
+                oNode = oNodeRoot.findNodeChild(morph.node, true);
+            }
+            if (!oNode) {
+                oNode = oNodeRoot.findNodeChildByLabel(morph.node, true);
+            }
+
+            if (!oNode) {
+                print("  WARNING: Node not found:", morph.node);
+                continue;
+            }
+
+            // Find the property
+            var oProp = getMorphPropFromNode(oNode, morph.prop);
+            if (!oProp) {
+                var oObj = oNode.getObject();
+                if (oObj) {
+                    for (var m = 0; m < oObj.getNumModifiers(); m++) {
+                        var mod = oObj.getModifier(m);
+                        if (mod.getLabel() === morph.prop || mod.getName() === morph.prop) {
+                            if (mod.getValueChannel) oProp = mod.getValueChannel(0);
+                            if (!oProp && mod.getValueControl) oProp = mod.getValueControl();
+                            if (oProp) break;
+                        }
+                    }
+                }
+            }
+
+            if (!oProp) {
+                print("  WARNING: Property not found:", morph.prop, "on node", morph.node);
+                continue;
+            }
+
+            // Apply the morph value at this frame using sawtooth pattern
+            createMorphFrame(oProp, absoluteFrame, morph.value);
+            print("  Set", morph.prop, "=", morph.value, "at frame", absoluteFrame, "(sawtooth)");
+            appliedCount++;
+        }
+    }
+
+    print("Applied", appliedCount, "GP art direction morphs");
+    return true;
 }

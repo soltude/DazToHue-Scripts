@@ -2,7 +2,7 @@
 
 
 // YOU MUST CHANGE THIS. If using windows, backslashes must be escaped (use two backslashes '\\")
-var DTH_POSES_PATH =  "D:\\DDaz3DLibrary\\DazToHue\\Poses\\",
+var DTH_POSES_PATH =  "D:/DAZ 3D/My DAZ 3D Library/DazToHue/Poses/",
 
 var options = {
 	bIncludeJCM: true,
@@ -10,26 +10,37 @@ var options = {
 	bIncludeFAC: true,
 	bIncludeDK: false,
 	bIncludeGP: false,
+	// Offsets for the fence poses, relative to the first frame of the GP ROM file
+	aGPFenceOffsets: [0, 95, 99, 102],
+	// Offsets for the fence poses, relative to the first frame of the DK9 ROM file
+	aDK9FenceOffsets: [0, 33, 46, 47, 49, 52],
 	bDQS: false,// set true to enable Dual Quat Skinning, defaults to linear
 	FACsDetailStrength: 1.0,
 	FlexionStrength: 1.0,
-	extraCSVs:[],
-	scannedCSV: dir_self.filePath ("OUT.csv"), 
+	extraJSONs: [],
+	extraCSVs: [],  // Legacy - only used by DthExportFBMs.dsa
+	scannedCSV: dir_self.filePath ("OUT.csv"),
 	successCSV: dir_self.filePath ("OUT_success.csv"),
-	failCSV: dir_self.filePath ("OUT_failed.csv")
+	failCSV: dir_self.filePath ("OUT_failed.csv"),
+	// Morphs to preserve after ROM loading. Example: [{ name: "body_ctrl_BreastsUp-Down", keepValue: 1 }]
+	preserveMorphs: [],
+	// Node transforms to preserve after ROM loading. Example: [{ nodeLabel: "Left Eye" }]
+	preserveNodeTransforms: [],
+	jcmMorphMods: []
 };
 
 
 // Set up paths - should only need to change if using custom ROMs
-var sRomPath = DTH_POSES_PATH + "Genesis 9\\";
-var ROM_DK9 = sRomPath + "Common\\Dicktator 9\\DK9 - Dicktator.duf";
+var sRomPath = DTH_POSES_PATH + "Genesis 9/";
+var ROM_DK9 = sRomPath + "Common/Dicktator 9/DK9 - Dicktator.duf";
+var ROM_GP9 = sRomPath + "Common/Golden Palace 9/GP9 - Golden Palace.duf";
 
-var G9_LINEAR_JCM = sRomPath + "Linear\\G9 LINEAR JCM FAC - Base.duf"; 
-var G9_LINEAR_JCM_FAC = sRomPath + "Linear\\G9 LINEAR JCM FAC - Base.duf"; 
-var G9_LINEAR_JCM_FAC_MOUTH = sRomPath + "Linear\\G9 LINEAR JCM FAC - Mouth.duf"; 
-var G9_DQS_JCM = sRomPath + "DQS\\G9 DQS JCM FAC - Base.duf"; 
-var G9_DQS_JCM_FAC_ = sRomPath + "DQS\\G9 DQS JCM FAC - Base.duf"; 
-var G9_DQS_JCM_FAC_MOUTH = sRomPath + "DQS\\G9 DQS JCM FAC - Mouth.duf"; 
+var G9_LINEAR_JCM = sRomPath + "Linear/G9 LINEAR JCM FAC - Base.duf";
+var G9_LINEAR_JCM_FAC = sRomPath + "Linear/G9 LINEAR JCM FAC - Base.duf";
+var G9_LINEAR_JCM_FAC_MOUTH = sRomPath + "Linear/G9 LINEAR JCM FAC - Mouth.duf";
+var G9_DQS_JCM = sRomPath + "DQS/G9 DQS JCM FAC - Base.duf";
+var G9_DQS_JCM_FAC = sRomPath + "DQS/G9 DQS JCM FAC - Base.duf";
+var G9_DQS_JCM_FAC_MOUTH = sRomPath + "DQS/G9 DQS JCM FAC - Mouth.duf"; 
 
 
 

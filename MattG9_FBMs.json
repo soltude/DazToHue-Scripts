@@ -1,0 +1,285 @@
+{
+  "meta": {
+    "version": "1.0",
+    "resetDKBeforeApplying": true,
+    "description": "Matt G9 Full Body Morphs (male) - relative frame offsets from ROM start"
+  },
+  "frames": [
+    {
+      "frame": 1,
+      "section": "FBM",
+      "name": "BodyTone",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "body_bs_BodyTone",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 2,
+      "section": "FBM",
+      "name": "Torso Muscular",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Torso Muscular",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 3,
+      "section": "FBM",
+      "name": "Arms Muscular",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Arms Muscular",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 4,
+      "section": "FBM",
+      "name": "Thigh Muscular",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Thigh Muscular",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 5,
+      "section": "FBM",
+      "name": "Belly Muscular",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_5 Belly Shape Muscular",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 6,
+      "section": "FBM",
+      "name": "Hip Size",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "body_bs_HipSize",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 7,
+      "section": "FBM",
+      "name": "Mass Thighs",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "body_bs_MassThighs",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 8,
+      "section": "FBM",
+      "name": "Thighs Thick 2",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "2023 Thighs Thick 2",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 9,
+      "section": "FBM",
+      "name": "Thigh Inflate",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Thigh Inflate",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 10,
+      "section": "FBM",
+      "name": "Thigh Depth",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Thigh Thickness Depth",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 11,
+      "section": "FBM",
+      "name": "Thigh Width",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Thigh Thickness Width",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 12,
+      "section": "FBM",
+      "name": "Glute Size 2",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute Size 2",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 13,
+      "section": "FBM",
+      "name": "Glute Width",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "body_bs_GluteWidth",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 14,
+      "section": "FBM",
+      "name": "Glute Inner Close",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute Inner Close",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 15,
+      "section": "FBM",
+      "name": "Glute Height Inner",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute Height Inner",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 16,
+      "section": "FBM",
+      "name": "Glute Width 2",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute Width",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 17,
+      "section": "FBM",
+      "name": "Glute Width Upper",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute Width Upper",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 18,
+      "section": "FBM",
+      "name": "Glute Width Lower",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute Width Lower",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 19,
+      "section": "FBM",
+      "name": "Glute Height Lower",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute Height Lower",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 20,
+      "section": "FBM",
+      "name": "Glute Angle",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute Angle",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 21,
+      "section": "FBM",
+      "name": "Glute Depth 2",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute Depth 2",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 22,
+      "section": "FBM",
+      "name": "Glute UpDown",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "SS_body_bs_Glute UpDown",
+          "value": -1
+        }
+      ]
+    },
+    {
+      "frame": 23,
+      "section": "FBM",
+      "name": "Round Hips 3",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "Round Hips 3",
+          "value": 1
+        }
+      ]
+    }
+  ]
+}
