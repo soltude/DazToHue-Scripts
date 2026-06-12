@@ -75,7 +75,16 @@ function ApplyDTHWorkflow(options){
 			return false;
 	}
 
-	// Restore node transforms that were overwritten by ROM loading (JCM, DK, GP)
+	/**       *****************************************************/
+	if( options["bIncludePhysics"] )
+	{
+		print("Applying Physics ROM...");
+		var startFrame = Scene.getAnimRange().end / Scene.getTimeStep();
+		if(!ApplyPhysics(options, oNodeRoot, startFrame))
+			return false;
+	}
+
+	// Restore node transforms that were overwritten by ROM loading (JCM, DK, GP, Physics)
 	restoreNodeTransforms(oNodeRoot, options.preserveNodeTransforms);
 
 	/** ****************************************************************/
@@ -211,6 +220,24 @@ function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
 
 	print("Setting keys to linear interpolation");
 	setLinearInterp([oNodeDk9]);
+}
+
+
+function ApplyPhysics(options, oNodeRoot, startFrame){
+	// Physics example ROM has 43 frames (offsets 0-42)
+	var physFrameCount = 43;
+	setTotalFrames(startFrame + physFrameCount);
+
+	var sPhysROM = options["physRomPath"] ? options["physRomPath"] : ROM_PHYS;
+	print("Loading ROM: ", sPhysROM, "at frame", startFrame);
+	if( !loadPreset(sPhysROM, oNodeRoot, startFrame) ){
+		print("Failed loading ROM:", sPhysROM);
+		return false;
+	}
+
+	print("Setting keys to linear interpolation");
+	setLinearInterp([oNodeRoot]);
+	return true;
 }
 
 

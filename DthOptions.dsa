@@ -10,6 +10,8 @@ var options = {
 	bIncludeFAC: true,
 	bIncludeDK: false,
 	bIncludeGP: false,
+	// Append the physics example ROM (breast/glute jiggle poses, 43 frames)
+	bIncludePhysics: false,
 	// Offsets for the fence poses, relative to the first frame of the GP ROM file
 	aGPFenceOffsets: [0, 95, 99, 102],
 	// Offsets for the fence poses, relative to the first frame of the DK9 ROM file
@@ -28,6 +30,7 @@ var options = {
 	mouthRomPath: null,
 	gpRomPath: null,
 	dkRomPath: null,
+	physRomPath: null,
 	// Per-character art direction JSONs for the pre-made GP/DK ROM blocks.
 	// Null falls back to GP9_ArtDirection.json / DK9_ArtDirection.json next to the scripts.
 	gpArtDirectionPath: null,
@@ -44,6 +47,7 @@ var options = {
 var sRomPath = DTH_POSES_PATH + "Genesis 9/";
 var ROM_DK9 = sRomPath + "Common/Dicktator 9/DK9 - Dicktator.duf";
 var ROM_GP9 = sRomPath + "Common/Golden Palace 9/GP9 - Golden Palace.duf";
+var ROM_PHYS = sRomPath + "Common/Physics/G9 Physics Example.duf";
 
 var G9_LINEAR_JCM = sRomPath + "Linear/G9 LINEAR JCM FAC - Base.duf";
 var G9_LINEAR_JCM_FAC = sRomPath + "Linear/G9 LINEAR JCM FAC - Base.duf";
