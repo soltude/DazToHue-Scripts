@@ -204,8 +204,8 @@ function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
 	//setFencePoses(oNodeDk9, 0, aFenceFrames);
 	setFencePoses(oNodeDk9, 0, [startFrame]);
 
-	// Apply DK9 art direction morphs from JSON
-	var dk9ArtDirectionPath = dir_self.filePath("DK9_ArtDirection.json");
+	// Apply DK9 art direction morphs from JSON (per-character override via options)
+	var dk9ArtDirectionPath = options["dkArtDirectionPath"] ? options["dkArtDirectionPath"] : dir_self.filePath("DK9_ArtDirection.json");
 	applyGPArtDirection(dk9ArtDirectionPath, oNodeRoot, startFrame);
 
 	print("Setting keys to linear interpolation");
@@ -227,8 +227,8 @@ function ApplyGP9(options, oNodeRoot, oNodeGP, startFrame){
 		return false;
 	}
 
-	// Apply GP art direction morphs from JSON
-	var gpArtDirectionPath = dir_self.filePath("GP9_ArtDirection.json");
+	// Apply GP art direction morphs from JSON (per-character override via options)
+	var gpArtDirectionPath = options["gpArtDirectionPath"] ? options["gpArtDirectionPath"] : dir_self.filePath("GP9_ArtDirection.json");
 	applyGPArtDirection(gpArtDirectionPath, oNodeRoot, startFrame);
 
 	var aFenceFrames = options["aGPFenceOffsets"].map(function(x){ return x + startFrame; });

@@ -22,6 +22,10 @@ var options = {
 	scannedCSV: dir_self.filePath ("OUT.csv"),
 	successCSV: dir_self.filePath ("OUT_success.csv"),
 	failCSV: dir_self.filePath ("OUT_failed.csv"),
+	// Per-character art direction JSONs for the pre-made GP/DK ROM blocks.
+	// Null falls back to GP9_ArtDirection.json / DK9_ArtDirection.json next to the scripts.
+	gpArtDirectionPath: null,
+	dkArtDirectionPath: null,
 	// Morphs to preserve after ROM loading. Example: [{ name: "body_ctrl_BreastsUp-Down", keepValue: 1 }]
 	preserveMorphs: [],
 	// Node transforms to preserve after ROM loading. Example: [{ nodeLabel: "Left Eye" }]
