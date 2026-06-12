@@ -337,10 +337,11 @@ function readFrameDataJSON(sFilename, frameDatas, iOffset){
 					nodeName: morph.node,
 					propName: morph.prop,
 					propValue: parseFloat(morph.value),
-					baseValue: (morph.base !== undefined) ? parseFloat(morph.base) : 0
+					baseValue: (morph.base !== undefined) ? parseFloat(morph.base) : 0,
+					autoBase: (morph.autoBase === true)
 				};
 				addFrameData(frameDatas, keyData);
-				verbose("add JSON frame data. frame:", frameNum, "prop:", morph.prop, "base:", keyData.baseValue);
+				verbose("add JSON frame data. frame:", frameNum, "prop:", morph.prop, "base:", keyData.baseValue, "autoBase:", keyData.autoBase);
 			}
 		}
 		frameCount++;
@@ -474,16 +475,70 @@ function resetFrameDatasAtFrame(oNodeRoot, frameDatas, resetFrame){
 					}
 
 					if(oProp){
-						// Set to 0 at reset frame
-						oProp.setValue(resetFrame * timeStep, 0);
+						// Use baseValue for reset (respects pre-existing morph values)
+						var resetValue = (keyData.baseValue !== undefined) ? keyData.baseValue : 0;
+						oProp.setValue(resetFrame * timeStep, resetValue);
 						processedProps[keyData.propName] = true;
-						verbose("Reset", keyData.propName, "to 0 at frame", resetFrame);
+						verbose("Reset", keyData.propName, "to", resetValue, "at frame", resetFrame);
 					}
 				}
 			}
 		}
 	}
-	print("Reset", Object.keys(processedProps).length, "morphs to 0 at frame", resetFrame);
+	print("Reset", Object.keys(processedProps).length, "morphs at frame", resetFrame);
+}
+
+
+/** Resolves autoBase flags in frameDatas by reading current property values from the scene.
+ *  Must be called before applyFrameDatas so that baseValue reflects the scene state. */
+function resolveAutoBaseValues(oNodeRoot, frameDatas){
+	var resolved = 0;
+	for(var i = 0; i < frameDatas.length; i++){
+		var frameData = frameDatas[i];
+		if(frameData && frameData.keyDatas){
+			for(var j = 0; j < frameData.keyDatas.length; j++){
+				var keyData = frameData.keyDatas[j];
+				if(!keyData.autoBase) continue;
+
+				// Find the node
+				var oNode;
+				if(oNodeRoot.getName() == keyData.nodeName || oNodeRoot.getLabel() == keyData.nodeName)
+					oNode = oNodeRoot;
+				else
+					oNode = oNodeRoot.findNodeChild(keyData.nodeName, true);
+				if(!oNode)
+					oNode = oNodeRoot.findNodeChildByLabel(keyData.nodeName, true);
+
+				if(oNode){
+					var oProp = getMorphPropFromNode(oNode, keyData.propName);
+					if(!oProp){
+						var oObj = oNode.getObject();
+						if(oObj){
+							for(var m = 0; m < oObj.getNumModifiers(); m++){
+								var mod = oObj.getModifier(m);
+								if(mod.getLabel() === keyData.propName || mod.getName() === keyData.propName){
+									if(mod.getValueChannel) oProp = mod.getValueChannel(0);
+									if(!oProp && mod.getValueControl) oProp = mod.getValueControl();
+									if(oProp) break;
+								}
+							}
+						}
+					}
+
+					if(oProp){
+						// Read the current value at time 0 (base state)
+						var currentValue = oProp.getValue(0);
+						keyData.baseValue = currentValue;
+						print("autoBase resolved:", keyData.propName, "current value:", currentValue);
+						resolved++;
+					}
+				}
+				// Clear the flag so it's not re-processed
+				keyData.autoBase = false;
+			}
+		}
+	}
+	if(resolved > 0) print("Resolved", resolved, "autoBase morph values from scene");
 }
 
 
