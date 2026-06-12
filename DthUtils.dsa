@@ -346,8 +346,48 @@ function readFrameDataJSON(sFilename, frameDatas, iOffset){
 		}
 		frameCount++;
 	}
+
+	// Optional `groups` array: frame ranges whose generation method needs a
+	// differently shaped timeline (additive: the first pose sustains across
+	// the group; cumulative: every pose sustains until the group end).
+	if (jsonData.groups && Array.isArray(jsonData.groups)) {
+		annotateGroupMethods(frameDatas, jsonData.groups, iOffset);
+	}
+
 	print("added", frameCount, "JSON frames from:", sFilename);
 	return frameDatas;
+}
+
+
+/** Marks the keyDatas of additive/cumulative group ranges so applyKeyData
+ *  can create sustained keys instead of the per-frame sawtooth.
+ *  advancedAdditive shapes the timeline like additive (the distinction is
+ *  Houdini-side). Props repeating within a cumulative group are ramps
+ *  (e.g. AnusOpen 22/35/80) — they skip the base re-anchor before their frame. */
+function annotateGroupMethods(frameDatas, groups, iOffset){
+	for (var g = 0; g < groups.length; g++) {
+		var group = groups[g];
+		var method = group.method === "advancedAdditive" ? "additive" : group.method;
+		if (method !== "additive" && method !== "cumulative") continue;
+		var startFrame = parseInt(group.startFrame) + iOffset;
+		var endFrame = parseInt(group.endFrame) + iOffset;
+		var seenProps = {};
+		for (var f = startFrame; f <= endFrame; f++) {
+			var frameData = frameDatas[f];
+			if (!frameData || !frameData.keyDatas) continue;
+			for (var k = 0; k < frameData.keyDatas.length; k++) {
+				var keyData = frameData.keyDatas[k];
+				var propKey = keyData.nodeName + "|" + keyData.propName;
+				keyData.groupMethod = method;
+				keyData.groupStart = startFrame;
+				keyData.groupEnd = endFrame;
+				keyData.isGroupBase = (f === startFrame);
+				keyData.rampContinuation = (seenProps[propKey] === true);
+				seenProps[propKey] = true;
+			}
+		}
+		print("annotated", method, "group", (group.name || ""), "frames", startFrame, "-", endFrame);
+	}
 }
 
 function printCSV(frameDatas, sOutFilename){
@@ -646,6 +686,20 @@ function applyKeyData(oNodeRoot, keyData, overrideFrameIdx){
 				return true;
 			}
 
+			// Additive/cumulative groups: the value sustains until the group
+			// end instead of sawtoothing back on the next frame. For additive
+			// only the base (first) pose sustains; the rest sawtooth normally.
+			if (keyData.groupMethod === "cumulative" ||
+				(keyData.groupMethod === "additive" && keyData.isGroupBase)) {
+				if (createSustainedMorphFrame(oProp, frameIdx, keyData.propValue, baseValue,
+						keyData.groupEnd, keyData.rampContinuation === true)) {
+					verbose("Successfully created sustained morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
+					return true;
+				}
+				print("Failed to create sustained morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
+				return false;
+			}
+
 			if(createMorphFrame(oProp, frameIdx, keyData.propValue, baseValue)){
 				verbose("Successfully created morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
 				return true;
@@ -706,6 +760,40 @@ function createMorphFrameByKey( oProperty, iFrame, fValue, iKey){
 // Creates a sawtooth keyframe pattern: adjacent frames are set to fBaseValue,
 // target frame is set to fValue. This prevents morph value leakage.
 // fBaseValue defaults to 0 if not specified.
+/* Creates a morph frame whose value SUSTAINS until the end of its group
+** instead of sawtoothing back on the next frame — for additive base poses
+** and cumulative group members (Custom ROM Guide generation methods).
+**
+** Keys: base at iFrame-1 (skipped for ramp continuations of the same prop,
+** e.g. AnusOpen 22/35/80), value at iFrame, value held at iGroupEnd, base
+** released at iGroupEnd+1.
+*/
+function createSustainedMorphFrame( oProperty, iFrame, fValue, fBaseValue, iGroupEnd, bRampContinuation ){
+	if( !oProperty ){
+		print("Error: Property is null.");
+		return false;
+	}
+	if( !oProperty.inherits("DzFloatProperty")){
+		print("Error: Property is not a DzFloatProperty.");
+		return false;
+	}
+	fBaseValue = (fBaseValue !== undefined) ? fBaseValue : 0;
+
+	var timeStep = Scene.getTimeStep();
+	if (!bRampContinuation) {
+		oProperty.setValue((iFrame - 1) * timeStep, fBaseValue);
+		verbose("Property", oProperty.getLabel(), "set at frame", iFrame - 1, "to", fBaseValue);
+	}
+	oProperty.setValue(iFrame * timeStep, fValue);
+	if (iGroupEnd > iFrame) {
+		oProperty.setValue(iGroupEnd * timeStep, fValue);
+	}
+	oProperty.setValue((iGroupEnd + 1) * timeStep, fBaseValue);
+	verbose("Set sustained morph frame for", oProperty.getLabel(), "at frame", iFrame, "to", fValue, "held until", iGroupEnd);
+	return true;
+}
+
+
 function createMorphFrame( oProperty, iFrame, fValue, fBaseValue ){
 	if( !oProperty ){
 		print("Error: Property is null.");
