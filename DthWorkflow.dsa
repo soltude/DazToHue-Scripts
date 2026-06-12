@@ -88,8 +88,14 @@ function ApplyDTHWorkflow(options){
 	printCSV(frameDatas, (dir_self.filePath ("OUT.csv")));
 
 	/** ****************************************************************/
-	// IMPORTANT: Set all FBM morphs to 0 at frame 0 to preserve base state
-	print("Setting FBM morphs to 0 at frame 0 to preserve base state");
+	// Resolve autoBase values by reading current morph values from the scene
+	// Must happen before reset so we know what value to restore
+	resolveAutoBaseValues(oNodeRoot, frameDatas);
+
+	/** ****************************************************************/
+	// IMPORTANT: Set FBM morphs at frame 0 to preserve base state
+	// Morphs with autoBase will be reset to their current scene value instead of 0
+	print("Setting FBM morphs at frame 0 to preserve base state");
 	resetFrameDatasAtFrame(oNodeRoot, frameDatas, 0);
 
 	/** ****************************************************************/

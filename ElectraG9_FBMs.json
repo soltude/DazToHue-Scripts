@@ -68,11 +68,11 @@
     {
       "frame": 6,
       "section": "FBM",
-      "name": "Huge Butt",
+      "name": "Booty Preset 04",
       "morphs": [
         {
           "node": "Genesis9",
-          "prop": "2023 Pear 2 Huge Butt",
+          "prop": "GC Booty Preset 04",
           "value": 1
         }
       ]
@@ -548,6 +548,30 @@
     {
       "frame": 46,
       "section": "FBM",
+      "name": "InvictaCouture PlungeBraU",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "InvictaCouture PlungeBraU MicroPressure",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 47,
+      "section": "FBM",
+      "name": "InvictaCouture WaistGarterBelt",
+      "morphs": [
+        {
+          "node": "Genesis9",
+          "prop": "InvictaCouture WaistGarterBelt MicroPressure",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "frame": 48,
+      "section": "FBM",
       "name": "SLGlutes SS",
       "morphs": [
         {
@@ -573,7 +597,7 @@
       ]
     },
     {
-      "frame": 47,
+      "frame": 49,
       "section": "FBM",
       "name": "SLGlutes Hip Bend Spandex",
       "morphs": [
