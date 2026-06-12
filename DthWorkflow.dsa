@@ -192,9 +192,10 @@ function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
 	setTotalFrames(totalFrames);
 	setFencePoses(oNodeRoot, 0, [startFrame]);
 
-	print("Loading ROM: ", ROM_DK9, "at frame", startFrame);
-	if( !loadPreset(ROM_DK9, oNodeDk9, startFrame) ){
-		print("Failed loading ROM:", ROM_DK9);
+	var sDk9ROM = options["dkRomPath"] ? options["dkRomPath"] : ROM_DK9;
+	print("Loading ROM: ", sDk9ROM, "at frame", startFrame);
+	if( !loadPreset(sDk9ROM, oNodeDk9, startFrame) ){
+		print("Failed loading ROM:", sDk9ROM);
 		return false;
 	}
 
@@ -221,9 +222,10 @@ function ApplyGP9(options, oNodeRoot, oNodeGP, startFrame){
 	// Set total frames before loading preset
 	setTotalFrames(totalFrames);
 
-	print("Loading ROM: ", ROM_GP9, "at frame", startFrame);
-	if( !loadPreset(ROM_GP9, oNodeGP, startFrame) ){
-		print("Failed loading ROM:", ROM_GP9);
+	var sGp9ROM = options["gpRomPath"] ? options["gpRomPath"] : ROM_GP9;
+	print("Loading ROM: ", sGp9ROM, "at frame", startFrame);
+	if( !loadPreset(sGp9ROM, oNodeGP, startFrame) ){
+		print("Failed loading ROM:", sGp9ROM);
 		return false;
 	}
 
