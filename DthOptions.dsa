@@ -2,7 +2,7 @@
 
 
 // YOU MUST CHANGE THIS. If using windows, backslashes must be escaped (use two backslashes '\\")
-var DTH_POSES_PATH =  "D:/DAZ 3D/My DAZ 3D Library/DazToHue/Poses/",
+var DTH_POSES_PATH =  "D:/DAZ 3D/My DAZ 3D Library/DazToHue/Poses/";
 
 var options = {
 	bIncludeJCM: true,
@@ -22,6 +22,12 @@ var options = {
 	scannedCSV: dir_self.filePath ("OUT.csv"),
 	successCSV: dir_self.filePath ("OUT_success.csv"),
 	failCSV: dir_self.filePath ("OUT_failed.csv"),
+	// Exact ROM file paths (e.g. from DTH Character Studio). Null falls back
+	// to the DTH_POSES_PATH resolution below.
+	jcmRomPath: null,
+	mouthRomPath: null,
+	gpRomPath: null,
+	dkRomPath: null,
 	// Per-character art direction JSONs for the pre-made GP/DK ROM blocks.
 	// Null falls back to GP9_ArtDirection.json / DK9_ArtDirection.json next to the scripts.
 	gpArtDirectionPath: null,
@@ -53,6 +59,11 @@ function getRomPaths(options)
 
 	var sJcmROM;
 	var sMouthROM;
+
+	// Exact paths from the caller win over the DTH_POSES_PATH resolution.
+	if( options["jcmRomPath"] ){
+		return [options["jcmRomPath"], options["mouthRomPath"]];
+	}
 
 	if( !options["bDQS"] )
 	{
