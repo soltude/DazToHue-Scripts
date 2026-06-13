@@ -196,16 +196,21 @@ function ApplyDefaultROMs(options, oNodeRoot, oNodeMouth){
 
 function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
 	// ---------------------------------------------------------------------------
-	// EXPERIMENTAL / INCOMPLETE: the DicktatorG9 path is not finished. Known gaps:
-	//   - dk9FrameCount is 55, but the ROM has 54 frames (offsets 0-53)
-	//   - aDK9FenceOffsets is computed below but NOT applied (only [startFrame] is
-	//     fenced); the foreskin-anchored fence frames are unmodeled
-	//   - the linear base length in ApplyDefaultROMs (617) may be stale for current
-	//     DTH releases
-	// JCM/FAC, GP9 and Physics are validated; treat DK output as a starting point.
+	// FUNCTIONAL, NOT YET HARDENED: the DicktatorG9 path has been run end-to-end and
+	// the morphs come through in Unreal, but it hasn't had the byte-level validation
+	// the JCM/FAC/GP9 paths have. Notes:
+	//   - dk9FrameCount corrected from 55 to 54 (DK9.csv is frames 0-53). The old 55
+	//     reserved one frame past the last pose; because the next section derives its
+	//     start from the timeline end, that surfaced as an empty gap once a section
+	//     (e.g. Physics) was appended after DK.
+	//   - internal fences are intentionally NOT applied (only [startFrame] is fenced).
+	//     DK was tested working without them, consistent with mrpdean's note that
+	//     fences aren't strictly needed when the sawtooth is clean.
+	//   - shipped DK9_ArtDirection.json is circumcised-only; the uncircumcised foreskin
+	//     path (DK9.csv frames 34-45 + foreskin-anchored fences) is unmodeled.
 	// ---------------------------------------------------------------------------
-	// DK9 ROM has ~54 frames (offsets 0-53)
-	var dk9FrameCount = 55;
+	// DK9 ROM is 54 frames (offsets 0-53)
+	var dk9FrameCount = 54;
 	var totalFrames = startFrame + dk9FrameCount;
 
 	print("Setting fence pose for", oNodeRoot.objectName, "from frame", 0, "to", startFrame);

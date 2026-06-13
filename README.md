@@ -138,8 +138,10 @@ must be Daz internal names. Save as comma-delimited with no quoting.
 
 - **Validated:** Genesis 9 (female), DQS, `JCM + FAC + GP9 + Physics` plus
   FBM/expression/corrective morphs from JSON.
-- **Experimental:** Dicktator G9 (`bIncludeDK`) — incomplete; see the banner in
-  `ApplyDK9`. Frame count and fence handling are not finalized.
+- **Functional, not hardened:** Dicktator G9 (`bIncludeDK`) — runs end-to-end and
+  the morphs come through in Unreal, but it hasn't had the byte-level validation the
+  other paths have. The internal fences are intentionally not applied (tested fine
+  without them); the uncircumcised foreskin path is unmodeled. See the notes in `ApplyDK9`.
 - **Not supported:** G8 / G8.1 / G3.
 
 ## Caveats
