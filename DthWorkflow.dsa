@@ -258,8 +258,16 @@ function ApplyPhysics(options, oNodeRoot, startFrame){
 
 
 function ApplyGP9(options, oNodeRoot, oNodeGP, startFrame){
-	// GP ROM has ~103 frames (offsets go to 102)
-	var gpFrameCount = 103;
+	// The GP ROM is 104 frames (rel 0-103). gpFrameCount = 104 reserves the whole
+	// block so the NEXT section starts at rel 104 - the frame after ClitorisErect -
+	// matching DK (dk9FrameCount = its full 54 frames). This is the 0-based Daz
+	// convention: timeline frame 0 is the first frame, and a section's frame 0 is its
+	// first frame, so a loadPreset ROM block (Physics) AND a 0-based extraJSONs
+	// section both land cleanly at rel 104. Verified against a real ElectraG9
+	// PoseAsset export: ClitorisErect at abs 431, FBM BodyTone at abs 432 (= 432 + 0).
+	// IMPORTANT: extraJSONs MUST be 0-based (first frame = 0). The older 103 handoff
+	// only worked because the JSONs were 1-based, which silently masked the overlap.
+	var gpFrameCount = 104;
 	var totalFrames = startFrame + gpFrameCount;
 
 	// Set total frames before loading preset
