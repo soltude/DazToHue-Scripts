@@ -94,7 +94,7 @@ function ApplyDTHWorkflow(options){
 	startFrame = !options.bIncludeJCM ? 0 : startFrame;
 	var frameDatas = CreateFrameDatas(options, startFrame);
 	print("Framedatas length:", frameDatas.length);
-	printCSV(frameDatas, (dir_self.filePath ("OUT.csv")));
+	if( options["bWriteDebugCSV"] ) printCSV(frameDatas, dir_self.filePath("OUT.csv"));
 
 	/** ****************************************************************/
 	// Resolve autoBase values by reading current morph values from the scene
@@ -113,14 +113,16 @@ function ApplyDTHWorkflow(options){
 	var failedFrameDatas = [];
 	applyFrameDatas(oNodeRoot, frameDatas, successFrameDatas, failedFrameDatas);
 
-	printCSV(successFrameDatas, options["successCSV"] );
-	printCSV(failedFrameDatas, options["failCSV"]);
+	if( options["bWriteDebugCSV"] ){
+		printCSV(successFrameDatas, options["successCSV"]);
+		printCSV(failedFrameDatas, options["failCSV"]);
 
-	/** ****************************************************************/
-	print("Scanning nodes for FrameDatas after operation");
-	var scannedFrameDatas = [];
-	scanNodesForFrameDatas(aNodes, scannedFrameDatas);
-	printCSV(scannedFrameDatas, options["scannedCSV"] );
+		/** ****************************************************************/
+		print("Scanning nodes for FrameDatas after operation");
+		var scannedFrameDatas = [];
+		scanNodesForFrameDatas(aNodes, scannedFrameDatas);
+		printCSV(scannedFrameDatas, options["scannedCSV"]);
+	}
 
 	/** ****************************************************************/
 	print("Setting keys to linear interpolation");
@@ -158,7 +160,7 @@ function ApplyInitialValues(options, oNodeRoot){
 	if( options["FACsDetailStrength"] > 0 ) {
 		setPropertyByName(oNodeRoot, "facs_ctrl_FACSDetailStrength", options["FACsDetailStrength"], 0) }
 	if( options["FlexionStrength"] > 0 ) {
-		setPropertyByName(oNodeRoot, "body_ctrl_FlexionAutoStrength", options["FACsDetailStrength"], 0) }
+		setPropertyByName(oNodeRoot, "body_ctrl_FlexionAutoStrength", options["FlexionStrength"], 0) }
 }
 
 
@@ -193,6 +195,15 @@ function ApplyDefaultROMs(options, oNodeRoot, oNodeMouth){
 
 
 function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
+	// ---------------------------------------------------------------------------
+	// EXPERIMENTAL / INCOMPLETE: the DicktatorG9 path is not finished. Known gaps:
+	//   - dk9FrameCount is 55, but the ROM has 54 frames (offsets 0-53)
+	//   - aDK9FenceOffsets is computed below but NOT applied (only [startFrame] is
+	//     fenced); the foreskin-anchored fence frames are unmodeled
+	//   - the linear base length in ApplyDefaultROMs (617) may be stale for current
+	//     DTH releases
+	// JCM/FAC, GP9 and Physics are validated; treat DK output as a starting point.
+	// ---------------------------------------------------------------------------
 	// DK9 ROM has ~54 frames (offsets 0-53)
 	var dk9FrameCount = 55;
 	var totalFrames = startFrame + dk9FrameCount;

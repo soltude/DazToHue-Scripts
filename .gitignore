@@ -1,0 +1,7 @@
+# Per-user Claude Code settings
+.claude/
+
+# Debug dumps written by DthWorkflow when options.bWriteDebugCSV is enabled
+OUT.csv
+OUT_success.csv
+OUT_failed.csv
