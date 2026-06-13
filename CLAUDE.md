@@ -45,11 +45,16 @@ Scripts set all morph keyframes to linear interpolation (`DzProperty.Linear`) to
 ## Configuration
 
 In DthOptions.dsa, key options include:
-- `DTH_POSES_PATH` - **Must be set** to your DazToHue/Poses folder (use forward slashes or escaped backslashes)
-- `bIncludeJCM/bIncludeFAC` - Whether to load base JCM and FAC ROMs
-- `bDQS` - Use Dual Quaternion Skinning ROMs (328 frames) vs Linear (617 frames)
-- `extraJSONs` - Array of JSON file paths to apply after ROM loading
-- `preserveMorphs` - Array of morphs to restore after ROM loading
+- `DTH_POSES_PATH` - **Must be set** to your DazToHue/Poses folder (forward slashes or escaped backslashes), unless exact paths are passed via the `*RomPath` options
+- `bIncludeJCM/bIncludeFAC` - Whether to load the base JCM and FAC mouth ROMs
+- `bIncludeGP` / `bIncludeDK` / `bIncludePhysics` - Append the Golden Palace / Dicktator (experimental) / Physics ROM blocks
+- `bDQS` - Use the Dual Quaternion Skinning base ROM (328 frames) vs Linear (~626 frames)
+- `extraJSONs` - Array of FrameData JSON files applied after the ROM blocks
+- `jcmRomPath` / `mouthRomPath` / `gpRomPath` / `dkRomPath` / `physRomPath` - Exact .duf paths; override the DTH_POSES_PATH resolution
+- `gpArtDirectionPath` / `dkArtDirectionPath` - Per-character art-direction JSONs for the GP/DK blocks
+- `preserveMorphs` / `preserveNodeTransforms` - Morphs / node transforms to restore after ROM loading
+- `jcmMorphMods` - Drive corrective morphs from bone rotation keyframes
+- `bWriteDebugCSV` - Write OUT*.csv debug dumps (off by default)
 
 ## DAZ Studio Script API Notes
 

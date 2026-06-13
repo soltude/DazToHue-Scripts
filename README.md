@@ -1,121 +1,159 @@
 # DazToHue-Scripts
 
-## Invokable User Scripts
+DAZ Studio scripts that automate building a full **Range of Motion (ROM)** on a
+Genesis 9 figure for the [DazToHue](https://www.artstation.com/marketplace/p/BLM5K/daztohue)
+(DTH) workflow — ready to export to Houdini / Unreal Engine.
 
-##### DthAddMorphFrameFromSelection
-##### DthScanFrames
-##### DthWorkflowFromCSV
-##### DthWorkflowExample
+One wrapper script applies, in order:
 
-## DthAddMorphFrameFromSelection
+1. the base **JCM (+ FAC mouth)** ROM from a DTH `.duf` pose preset,
+2. optional **Golden Palace**, **Dicktator** *(experimental)* and **Physics** ROM blocks,
+3. your own **full-body / expression / corrective morphs** from a FrameData JSON,
 
-Invokable user script. Adds a key for a morph or property and sets keys around it. 
+then sets every key to linear interpolation so the export is predictable.
 
-	1. Create a custom action for the script and bind a keyboard shortcut to it. 
-	2. Scrub to the frame you want to create a morph on. 
-	3. With your mouse hovering over the property in the Parameters pane, execute the shortcut.
-	4. The script will set that value to it's maximum (or 1), and will set the appropriate keys on the previous and next frames to get the sawtooth pattern. 
+## How it works
 
-## FrameDatas CSV format
+A small per-character wrapper (see `DthWorkflowExample.dsa` and
+`DthWorkflowElectraG9.dsa`) includes `DthWorkflow.dsa`, fills in an `options`
+object, and calls `ApplyDTHWorkflow(options)`:
 
-This CSV format should include all the information of a ROM, in a way that can be easily modified from Excel or similar, and then applied to a Daz figure's timeline.  
+```
+DthWorkflowElectraG9.dsa            (per-character wrapper — sets options)
+  └── DthWorkflow.dsa               (ApplyDTHWorkflow + ApplyDefaultROMs/GP9/DK9/Physics)
+        ├── DthUtils.dsa            (timeline / morph / JSON / node helpers)
+        ├── DthOptions.dsa          (default options + getRomPaths)
+        └── ScanKeyFrames.dsa       (post-op keyframe scanning, debug only)
+```
 
-Each row corresponds to a frame of animation. The first column is the frame number, the second is the section name (e.g. GEN, PHY, etc.), and the third is the name of the morph to be used in Hou/UE. (These names aren't really implemented yet and are mostly left as empty strings, but hopefully eventually can be used to automate part of the Houdini side of things.)
+The framework does **not** contain the ROM data — the JCM/FAC/GP/DK/Physics
+keyframes live in mrpdean's licensed `.duf` presets, which the script loads from
+your Daz library. The scripts orchestrate that loading and stamp your custom
+morphs on top.
 
-	|1,EXP,Smile, 
+## Setup
 
-After these first three columns, groups of three columns specify a morph or property and a value. `nodeName` and `propName` must be Daz ***names***, not labels. `propValue` is a float, not a percent, so 1 means 100% on a slider.   
+1. In `DthOptions.dsa`, set **`DTH_POSES_PATH`** to your `DazToHue/Poses/` folder
+   (forward slashes, or escaped backslashes). *Or* pass exact `.duf` paths via the
+   `*RomPath` options and skip this.
+2. Copy `DthWorkflowExample.dsa` to a per-character script and set its `options`.
+3. Create a DAZ **custom action** for that script (Window → Workspace → Customize)
+   and optionally bind a shortcut.
+4. Select the **Genesis 9** root node and any sub-figures you're posing
+   (`Genesis 9 Mouth`, `GoldenPalace_G9`, `DicktatorG9`).
+5. Invoke. The run is wrapped in a single undo.
 
-	|nodeName, propName, propValue
+## Options (`DthOptions.dsa`)
 
-e.g.  
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `bIncludeJCM` | bool | `true` | Load the base JCM ROM (and the FAC mouth ROM if `bIncludeFAC`). When `false`, only the `extraJSONs` are applied (from frame 0). |
+| `bIncludeFAC` | bool | `true` | Use the FAC version of the base ROM and load the Mouth ROM. |
+| `bIncludeGP` | bool | `false` | Append the Golden Palace 9 ROM block (~103 frames). |
+| `bIncludeDK` | bool | `false` | **Experimental** — append the Dicktator G9 ROM block (incomplete, see `ApplyDK9`). |
+| `bIncludePhysics` | bool | `false` | Append the G9 Physics Example ROM (breast/glute jiggle, 43 frames). |
+| `bDQS` | bool | `false` | Dual-Quaternion-Skinning base ROM (328 frames) vs Linear (~626 frames). |
+| `FACsDetailStrength` | float | `1.0` | Sets `facs_ctrl_FACSDetailStrength` at frame 0 (when > 0). |
+| `FlexionStrength` | float | `1.0` | Sets `body_ctrl_FlexionAutoStrength` at frame 0 (when > 0). |
+| `extraJSONs` | [string] | `[]` | FrameData JSON files applied after the ROM blocks (see format below). |
+| `jcmRomPath`, `mouthRomPath`, `gpRomPath`, `dkRomPath`, `physRomPath` | string \| null | `null` | Exact `.duf` paths. Non-null values override the `DTH_POSES_PATH` resolution. |
+| `gpArtDirectionPath`, `dkArtDirectionPath` | string \| null | `null` | Per-character art-direction JSON stamped onto the GP/DK block. Falls back to `GP9_ArtDirection.json` / `DK9_ArtDirection.json` next to the scripts. |
+| `aGPFenceOffsets` | [int] | `[0,95,99,102]` | Fence-frame offsets within the GP block (memorize/restore figure to stop drift between art-directed sections). |
+| `aDK9FenceOffsets` | [int] | `[0,33,46,47,49,52]` | DK fence offsets *(experimental — not currently applied)*. |
+| `preserveMorphs` | [{name, keepValue}] | `[]` | Morphs to re-assert after ROM loading, e.g. `{ name: "body_ctrl_BreastsUp-Down", keepValue: 0.6 }`. |
+| `preserveNodeTransforms` | [{nodeLabel}] | `[]` | Node transforms memorized before ROM loading and restored after, e.g. `{ nodeLabel: "Left Eye" }`. |
+| `jcmMorphMods` | [obj] | `[]` | Drive corrective morphs proportionally to a bone's rotation keyframes (linear angle→value mapping). |
+| `extraCSVs` | [string] | `[]` | Legacy — only used by `DthExportFBMs.dsa`. |
+| `bWriteDebugCSV` | bool | `false` | Write `OUT*.csv` dumps (frameDatas / success / failed / scanned) to the scripts folder. |
 
-    |4,,,l_toes,XRotate,-60
-    |306,,,|r_upperarm,XRotate,-90,|r_upperarm,YRotate,-45,|r_upperarm,ZRotate,-45|
+## FrameData JSON format
 
-^(Pipes just to show how the different props get read and written, the actual CSV is just commas.)
+The primary way to add custom morphs. Frame numbers are **relative** — the ROM
+block's start frame is added automatically, so the same JSON works regardless of
+where it lands on the timeline.
 
-These CSVs can be generated by running the DthScanFrames script described below.
+```json
+{
+  "meta": { "resetGPBeforeApplying": false },
+  "frames": [
+    {
+      "frame": 0,
+      "section": "FBM",
+      "name": "Heavy",
+      "morphs": [
+        { "node": "Genesis9", "prop": "body_bs_Heavy", "value": 1.0 }
+      ]
+    },
+    {
+      "frame": 1,
+      "section": "GEN",
+      "name": "Anus_Open",
+      "morphs": [
+        { "node": "GoldenPalace_G9", "prop": "GP9_Anus_Open", "value": 1.0, "base": 0.0, "autoBase": false }
+      ]
+    }
+  ],
+  "groups": [
+    { "name": "EyelidsClosed", "method": "additive", "startFrame": 10, "endFrame": 13 }
+  ]
+}
+```
 
-## DthScanFrames 
+- `node` / `prop` are Daz **internal names** (not labels). `value` is a float —
+  `1.0` = 100% on a slider.
+- `base` (optional) is the sawtooth anchor value the adjacent frames are set to
+  (default `0`). `autoBase: true` resolves that anchor from the morph's current
+  scene value at run time.
+- `section` / `name` are the Houdini/UE category and morph name (carried through
+  for the PoseAsset side).
+- `groups` (optional) marks frame ranges with a **generation method**:
+  - `additive` — the first pose sustains across the group; the rest sawtooth on top.
+  - `cumulative` — every pose sustains until the group end (repeated props ramp).
+  - `advancedAdditive` — shaped like `additive` here (the distinction is Houdini-side).
+  - omitted / `individual` / `default` — plain isolated sawtooth.
 
-Invokable user script. Scans frames and records key frames in frameDatas CSV format.
+## FrameData CSV format (scan / legacy)
 
-1. Create a custom action for the script. 
-2. (Optional) Edit `OUT_FILENAME` in the script. By default will save to this scripts folder with Genesis9's node label.
-3. Make sure the root node and any subnodes with morphs you want to record are selected (e.g. DK9, GP9, etc).
-4. Invoke the script. 
+`DthScanFrames.dsa` exports the current timeline to this CSV, editable in any
+spreadsheet. Each row: `frame, section, name, nodeName, propName, propValue[, …]`
 
+```
+4,,,l_toes,XRotate,-60
+306,,,r_upperarm,XRotate,-90,r_upperarm,YRotate,-45,r_upperarm,ZRotate,-45
+```
 
-##  DthWorkflow.dsa
+After the first three columns, column triplets specify a node/prop/value. Names
+must be Daz internal names. Save as comma-delimited with no quoting.
 
-Contains functions for automating much of the DTH workflow. Included by user scripts. 
+## Invokable user scripts
 
-## DthOptions.dsa
+- **`DthWorkflowExample.dsa`** — copy, set `options`, apply a full ROM. The main entry.
+- **`DthWorkflowFromCSV.dsa`** — apply morphs from JSON/CSV only, no ROM loading.
+- **`DthAddMorphFrameFromSelection.dsa`** — sawtooth-key the property hovered in the Parameters pane, then advance a frame.
+- **`DthScanFrames.dsa`** — scan selected nodes and export keyframes to CSV.
+- **`DthSetLinearInterp.dsa`** — set all morph keys on the selection to linear interpolation.
+- **`DthExportFBMs.dsa`** — apply FBMs at frame 0 and drive the DazToMaya `B_FIG.fbx` export.
 
-Contains an options object used by and overrideable in the DthWorkflow scripts.
+## Status
 
-You MUST set the value for `DTH_POSES_PATH` to point the the `DazToHue\Poses\` folder in your Daz library if you want to load ROM .dufs from the script.
-
-|Option | type | description|
-|---|---|---|
-|`bIncludeJCM`| true | if true, loads standard ROMs, otherwise loads only CSVs|
-|`bIncludeFAC`| true | set true to include use the FAC version of the ROM|
-|~~~`bIncludeDK`~~~| false|not working|
-|~~~`bIncludeGP`~~~| false|not working|
-|`bDQS`| false| set true to enable Dual Quat Skinning, defaults to linear (untested)|
-|`FACsDetailStrength`| 1.0||
-|`FlexionStrength`| 1.0||
-|`extraJSONs`|[string]|paths to FrameData JSON files|
-|`extraCSVs`|[string]|Legacy - paths to FrameData CSVs (only used by DthExportFBMs.dsa)|
-
-1. Modify DthWorkflowExample to set the options you want. You MUST set `sPathDthPoses` for your hard drive. 
-2. Make a DAZ custom action so you can invoke it. 
-3. With the Genesis9 root node selected, invoke the script. 
-4. The script will apply the base JCM and Mouth ROM. 
-5. The script will apply the extra CSV files in order, setting the morph values as well as setting the keys on the frames surrounding it. 
-6. The script will also set all key frames to linear interpolation. 
-
-### Extra CSVs
-
-Specified by an array of pathnames in the `options` object, these are FrameDatas CSV files that will be applied sequentially to the animation after the JCM and Mouth ROMs are applied, as of DTH1.7 this means frame 617. 
-
-These can be made using DthScanFrames.dsa and edited in Excel or any spreadsheet software, just make sure you save as CSV with comma delimiters and no quoting. I don't sanitize the CSV and do only basic null testing. 
-
-## DthWorkflowExample.dsa
-
-1. Modify DthWorkflowExample to set the options you want. You MUST set `sPathDthPoses` for your hard drive. 
-2. Make a DAZ custom action so you can invoke it. 
-3. Select the root Genesis9 node and any node which has morphs to be set (mouth, genetalia, etc.)
-4. Invoke the script. 
-5. The script will apply the base JCM and Mouth ROM. 
-6. The script will apply the extra CSV files in order, setting the morph values as well as setting the keys on the frames surrounding it. 
-7. The script will also set all key frames to linear interpolation. 
-
-## DthWorkflowFromCSV.dsa
-
-User invokable script, needs to be modified to select CSV files to load. Not well tested.
-
-1. In the script, change `options.extraJSONs` to the JSON files you want to load. (you can use absolute paths.)
-2. Set the total frames to 1. 
-3. Select the root Genesis9 node and any nodes which has morphs to be set (mouth, genetalia, etc.)
-4. Invoke the script. 
-
-
-
-## What it doesn't do
-
-* the script doesn't change the tear UVs. I don't think it would be hard, just have to do it.
-* doesn't set fence frames. mrpdean said (I think) we don't need them, and the script ensures proper sawtooth pattern. The functions exist if you need them, I just don't call them. 
-* doesn't automatically call DazToMaya or Alembic export, nor set their settings. If anyone knows a way to do this, let me know and I'll add it. SubD and resolution are up to you, but I could add that if anyone wants it. 
-* Trying to load the DK and GP ROMS from the script fails on certain morphs (possibly because of a '!' in part some of the prop paths, idk). For my workflow, I've just converted them to CSVs and apply them that way. 
-* *partially implemented* ~~Doesn't load the JCM ROMs via CSV, still loads from a DTH .duf file. I think it should be somewhat straightforward, though, and would allow you load and save the whole thing as one CSV.~~
-
+- **Validated:** Genesis 9 (female), DQS, `JCM + FAC + GP9 + Physics` plus
+  FBM/expression/corrective morphs from JSON.
+- **Experimental:** Dicktator G9 (`bIncludeDK`) — incomplete; see the banner in
+  `ApplyDK9`. Frame count and fence handling are not finalized.
+- **Not supported:** G8 / G8.1 / G3.
 
 ## Caveats
 
-* You may have  to click the `toggle override` icon on the parameter pane slider for some morphs if they're driven by a controller and you use them in a morph frame. For instance, the DK9 shaping presets control DK_Shaft_Scale_2, which is used in one of the morph frames. (This is only when you load the CSV onto a character with shaping applied, not when you're creating a CSV which is best done on rest pose G9/DK/GP) 
-* I've done no unit testing and fairly rudimentary tests in general. Save copies of everything you don't want corrupted, but any user invokable scripts should be undo-able. By default, CSV files are overwritten. 
-* The timeline range isn't always set properly, but all frames seem to be applied if the operation comples. Just extend the range after the script. Might fix this later. 
-* The script finds the first node with a given name, so it's possible that the wrong node will have a morph applied to it, but I haven't found that to be the case. If you do, let me know and I might have to use full paths.
+- For morphs driven by a controller, you may need to click the **toggle override**
+  icon on the Parameters-pane slider when applying onto a character that already
+  has shaping. (Build ROMs on a rest-pose figure to avoid this.)
+- Rudimentary testing only. Keep backups; user-invokable scripts are undo-able.
+- The timeline range isn't always set perfectly — if a run completes but the range
+  looks short, extend it; all frames are still applied.
+- Node lookup matches the **first** node with a given name. If the wrong node gets
+  a morph, switch to full paths (hasn't been observed in practice).
 
+## License
+
+See [LICENSE](./LICENSE). The `.duf` ROM presets are **not** part of this repo —
+they are mrpdean's licensed DazToHue assets; bring your own.

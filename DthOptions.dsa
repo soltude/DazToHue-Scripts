@@ -21,6 +21,9 @@ var options = {
 	FlexionStrength: 1.0,
 	extraJSONs: [],
 	extraCSVs: [],  // Legacy - only used by DthExportFBMs.dsa
+	// Write OUT*.csv debug dumps (frameDatas / success / failed / scanned) into the
+	// scripts folder. Off by default so normal runs don't litter the repo.
+	bWriteDebugCSV: false,
 	scannedCSV: dir_self.filePath ("OUT.csv"),
 	successCSV: dir_self.filePath ("OUT_success.csv"),
 	failCSV: dir_self.filePath ("OUT_failed.csv"),
