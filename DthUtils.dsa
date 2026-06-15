@@ -250,24 +250,48 @@ function readFrameDataJSON(sFilename, frameDatas, iOffset){
 		return frameDatas;
 	}
 
-	if (!jsonData.frames || !Array.isArray(jsonData.frames)) {
-		print("ERROR: JSON file missing 'frames' array:", sFilename);
-		return frameDatas;
-	}
-
-	// Handle resetGPBeforeApplying - reset GP morphs at FBM start to prevent leakage
+	// For resetGPBeforeApplying the file path reads the sibling GP9_ArtDirection.json
+	// (inline callers pass the parsed data straight to processFrameDataJSON).
+	var gpArtData = null;
 	if (jsonData.meta && jsonData.meta.resetGPBeforeApplying === true) {
-		var oFileInfo = new DzFileInfo(sFilename);
-		var gpJsonPath = oFileInfo.path() + "/GP9_ArtDirection.json";
-
+		var oFileInfoGp = new DzFileInfo(sFilename);
+		var gpJsonPath = oFileInfoGp.path() + "/GP9_ArtDirection.json";
 		var gpFile = new DzFile(gpJsonPath);
 		if (gpFile.open(gpFile.ReadOnly)) {
 			var gpContent = gpFile.read();
 			gpFile.close();
-
 			try {
-				var gpData = JSON.parse(gpContent);
-				if (gpData.frames && gpData.frames.length > 0) {
+				gpArtData = JSON.parse(gpContent);
+			} catch (e) {
+				print("ERROR: Failed to parse GP9_ArtDirection.json:", e);
+			}
+		} else {
+			print("WARNING: Could not open GP9_ArtDirection.json at:", gpJsonPath);
+		}
+	}
+	return processFrameDataJSON(jsonData, frameDatas, iOffset, gpArtData);
+}
+
+/**
+ * Process an already-parsed frame-data object (same shape as the *_FBMs.json
+ * files) into `frameDatas`. Split out of readFrameDataJSON so callers can pass
+ * the data inline (DTH Character Studio's single-file script) instead of a file.
+ * `gpArtData` (optional) is the parsed GP9 art-direction object used for the
+ * resetGPBeforeApplying reset; pass null to skip the reset.
+ */
+function processFrameDataJSON(jsonData, frameDatas, iOffset, gpArtData){
+	frameDatas = frameDatas || [];
+	iOffset = iOffset || 0;
+
+	if (!jsonData || !jsonData.frames || !Array.isArray(jsonData.frames)) {
+		print("ERROR: frame data missing 'frames' array");
+		return frameDatas;
+	}
+
+	// Handle resetGPBeforeApplying - reset GP morphs at FBM start to prevent leakage
+	if (jsonData.meta && jsonData.meta.resetGPBeforeApplying === true && gpArtData) {
+		var gpData = gpArtData;
+		if (gpData.frames && gpData.frames.length > 0) {
 					// Find the last frame (highest frame number)
 					var lastFrame = null;
 					var maxFrameNum = -1;
@@ -305,15 +329,9 @@ function readFrameDataJSON(sFilename, frameDatas, iOffset){
 						}
 						print("Reset", lastFrame.morphs.length, "GP morphs from frame", lastFrame.name, "at FBM start frame", firstFrameNum);
 					} else {
-						print("WARNING: GP9 last frame has no morphs defined - nothing to reset");
+						print("WARNING: GP9 art direction last frame has no morphs defined - nothing to reset");
 					}
 				}
-			} catch (e) {
-				print("ERROR: Failed to parse GP9_ArtDirection.json:", e);
-			}
-		} else {
-			print("WARNING: Could not open GP9_ArtDirection.json at:", gpJsonPath);
-		}
 	}
 
 	var frameCount = 0;
@@ -354,7 +372,7 @@ function readFrameDataJSON(sFilename, frameDatas, iOffset){
 		annotateGroupMethods(frameDatas, jsonData.groups, iOffset);
 	}
 
-	print("added", frameCount, "JSON frames from:", sFilename);
+	print("added", frameCount, "frames from frame data");
 	return frameDatas;
 }
 
@@ -1370,9 +1388,14 @@ function applyGPArtDirection(sJsonPath, oNodeRoot, startFrame) {
         print("ERROR: Failed to parse GP art direction JSON:", e);
         return false;
     }
+    return applyArtDirectionData(jsonData, oNodeRoot, startFrame);
+}
 
-    if (!jsonData.frames || !Array.isArray(jsonData.frames)) {
-        print("ERROR: GP art direction JSON missing 'frames' array");
+// Apply already-parsed art-direction frames (split out of applyGPArtDirection so
+// DTH Character Studio's single-file script can pass the data inline).
+function applyArtDirectionData(jsonData, oNodeRoot, startFrame) {
+    if (!jsonData || !jsonData.frames || !Array.isArray(jsonData.frames)) {
+        print("ERROR: art direction data missing 'frames' array");
         return false;
     }
 
