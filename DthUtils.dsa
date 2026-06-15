@@ -80,6 +80,10 @@ function setTotalFrames(iTotalFrames){
 	var oTimeRange = new DzTimeRange(0, iTotalFrames * Scene.getTimeStep());
 	print("Setting new time range:", oTimeRange.start, "to", oTimeRange.end);
 	Scene.setAnimRange(oTimeRange);
+	// Also extend the play range — otherwise the timeline scrubber stays bounded
+	// to the previous (shorter) play range and you can't reach the later frames
+	// (e.g. the FBM section after the GP block).
+	Scene.setPlayRange(oTimeRange);
 }
 
 /**********************************************************************
@@ -690,6 +694,10 @@ function applyKeyData(oNodeRoot, keyData, overrideFrameIdx){
 		}
 
 		if(oProp){
+			// DAZ Studio 6 pops a "keep limits?" dialog when a value exceeds the
+			// property's min/max. Disable clamping on this property so the morph
+			// applies without any prompt (guarded — the method name may differ).
+			if(typeof oProp.setIsClamped === "function") oProp.setIsClamped(false);
 			//var iKey = oProp.getNumKeys();
 			//*********** Main action - create the morph frame;
 			// if(createMorphFrameByKey(oProp, keyData.frameIdx, keyData.propValue, iKey)){
