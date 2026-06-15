@@ -138,6 +138,13 @@ function ApplyDTHWorkflow(options){
 function CreateFrameDatas(options, startFrame){
 	frameDatas = [];
 	var iOffset = startFrame;
+	// Inline frame data (DTH Character Studio's single-file script) takes priority
+	// over the legacy extraJSONs file list — no separate JSON files needed.
+	if(options.extraFrames){
+		print("Processing inline extraFrames starting at frame", iOffset);
+		processFrameDataJSON(options.extraFrames, frameDatas, iOffset, options.gpArtDirection);
+		return frameDatas;
+	}
 	print("Loading JSONs starting at frame", iOffset);
 	var extraJSONs = options.extraJSONs;
 	if(extraJSONs){
@@ -230,9 +237,14 @@ function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
 	//setFencePoses(oNodeDk9, 0, aFenceFrames);
 	setFencePoses(oNodeDk9, 0, [startFrame]);
 
-	// Apply DK9 art direction morphs from JSON (per-character override via options)
-	var dk9ArtDirectionPath = options["dkArtDirectionPath"] ? options["dkArtDirectionPath"] : dir_self.filePath("DK9_ArtDirection.json");
-	applyGPArtDirection(dk9ArtDirectionPath, oNodeRoot, startFrame);
+	// Apply DK9 art direction morphs (per-character). Inline data (from the
+	// single-file character script) wins over a file path.
+	if( options["dkArtDirection"] ){
+		applyArtDirectionData(options["dkArtDirection"], oNodeRoot, startFrame);
+	} else {
+		var dk9ArtDirectionPath = options["dkArtDirectionPath"] ? options["dkArtDirectionPath"] : dir_self.filePath("DK9_ArtDirection.json");
+		applyGPArtDirection(dk9ArtDirectionPath, oNodeRoot, startFrame);
+	}
 
 	print("Setting keys to linear interpolation");
 	setLinearInterp([oNodeDk9]);
@@ -280,9 +292,14 @@ function ApplyGP9(options, oNodeRoot, oNodeGP, startFrame){
 		return false;
 	}
 
-	// Apply GP art direction morphs from JSON (per-character override via options)
-	var gpArtDirectionPath = options["gpArtDirectionPath"] ? options["gpArtDirectionPath"] : dir_self.filePath("GP9_ArtDirection.json");
-	applyGPArtDirection(gpArtDirectionPath, oNodeRoot, startFrame);
+	// Apply GP art direction morphs (per-character). Inline data (from the
+	// single-file character script) wins over a file path.
+	if( options["gpArtDirection"] ){
+		applyArtDirectionData(options["gpArtDirection"], oNodeRoot, startFrame);
+	} else {
+		var gpArtDirectionPath = options["gpArtDirectionPath"] ? options["gpArtDirectionPath"] : dir_self.filePath("GP9_ArtDirection.json");
+		applyGPArtDirection(gpArtDirectionPath, oNodeRoot, startFrame);
+	}
 
 	var aFenceFrames = options["aGPFenceOffsets"].map(function(x){ return x + startFrame; });
 	print("Setting fence poses for", oNodeGP.objectName, "from frame", 0, "to", aFenceFrames);
@@ -294,4 +311,38 @@ function ApplyGP9(options, oNodeRoot, oNodeGP, startFrame){
 	return true;
 }
 
+
+/*********************************************************************************
+ * Single-call entry for DTH Character Studio. The generated per-character script
+ * <CharacterName>_<Genesis>.dsa includes this file and makes ONE call:
+ *
+ *     ApplyDTHCharacter({ ...full config + all ROM morph definitions inline... });
+ *
+ * The config carries everything that used to live in separate files
+ * (extraJSONs / *_FBMs.json, GP9/DK9 art-direction JSONs): workflow flags, ROM
+ * paths, strengths, preserve lists, jcmMorphMods, the FBM/extra frames
+ * (config.extraFrames) and the GP/DK art direction (config.gpArtDirection /
+ * config.dkArtDirection). It maps onto the shared `options` and runs the normal
+ * workflow — no extra .json/.csv files are read from disk.
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+function ApplyDTHCharacter(config){
+	config = config || {};
+	// Override the shared defaults with whatever the character config supplies.
+	var keys = [
+		"bIncludeJCM", "bIncludeFAC", "bIncludeDK", "bIncludeGP", "bIncludePhysics", "bDQS",
+		"FACsDetailStrength", "FlexionStrength",
+		"jcmRomPath", "mouthRomPath", "gpRomPath", "dkRomPath", "physRomPath",
+		"aGPFenceOffsets", "aDK9FenceOffsets",
+		"preserveMorphs", "preserveNodeTransforms", "jcmMorphMods"
+	];
+	for(var i = 0; i < keys.length; i++){
+		if(config[keys[i]] !== undefined) options[keys[i]] = config[keys[i]];
+	}
+	// Inline ROM morph definitions + art direction replace the extra *.json files.
+	options.extraFrames = config.extraFrames ? config.extraFrames : null;
+	options.gpArtDirection = config.gpArtDirection ? config.gpArtDirection : null;
+	options.dkArtDirection = config.dkArtDirection ? config.dkArtDirection : null;
+	options.extraJSONs = [];
+	return ApplyDTHWorkflow(options);
+}
 
