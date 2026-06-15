@@ -130,6 +130,16 @@ function ApplyDTHWorkflow(options){
 	// Reset timeline to frame 0 so character appears in base state
 	Scene.setFrame(0);
 
+	// Restore the user's initial selection — loading the ROM presets re-selected
+	// nodes along the way; on a clean finish, put the original selection back.
+	Scene.selectAllNodes(false);
+	if( aNodes ){
+		for( var iSel = 0; iSel < aNodes.length; iSel++ ){
+			if( aNodes[iSel] ) aNodes[iSel].select(true);
+		}
+	}
+	if( oNode ) Scene.setPrimarySelection(oNode);
+
 	acceptUndo("DTH Workflow");
 }
 
