@@ -1,6 +1,8 @@
 // DAZ Studio version 4.22.0.16 filetype DAZ Script
 
-// DthUtils.dsa must exist in the same folder as this script
+// DthUtils.dsa + DthOptions.dsa load relative to the INVOKING script's folder:
+// getScriptFileName() resolves to the top-level script being run, not this file,
+// so they must sit alongside whatever script includes this one.
 var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
 include (dir_self.filePath ("DthUtils.dsa"));
 include (dir_self.filePath ("DthOptions.dsa"));
@@ -151,7 +153,7 @@ function CreateFrameDatas(options, startFrame){
 	// over the legacy extraJSONs file list — no separate JSON files needed.
 	if(options.extraFrames){
 		print("Processing inline extraFrames starting at frame", iOffset);
-		processFrameDataJSON(options.extraFrames, frameDatas, iOffset, options.gpArtDirection);
+		processFrameDataJSON(options.extraFrames, frameDatas, iOffset, options.gpArtDirection, options.dkArtDirection);
 		return frameDatas;
 	}
 	print("Loading JSONs starting at frame", iOffset);

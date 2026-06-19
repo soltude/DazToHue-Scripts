@@ -74,7 +74,7 @@ where it lands on the timeline.
 
 ```json
 {
-  "meta": { "resetGPBeforeApplying": false },
+  "meta": { "resetGPBeforeApplying": true, "resetDKBeforeApplying": true },
   "frames": [
     {
       "frame": 0,
@@ -99,6 +99,14 @@ where it lands on the timeline.
 }
 ```
 
+- `meta.resetGPBeforeApplying` / `meta.resetDKBeforeApplying` zero the active
+  genital ROM's morphs (Golden Palace / Dicktator) at the **first frame of this
+  block**, so the GP/DK morphs don't leak into the custom (FBM) poses. The reset
+  reads the morph list from the matching sibling `GP9_ArtDirection.json` /
+  `DK9_ArtDirection.json` (or the inline `gpArtDirection` / `dkArtDirection`), and
+  only fires for whichever block's art-direction data is present. DTH Character
+  Studio emits both flags from one generic "Reset genitalia morphs before extra
+  frames" option.
 - `node` / `prop` are Daz **internal names** (not labels). `value` is a float —
   `1.0` = 100% on a slider.
 - `base` (optional) is the sawtooth anchor value the adjacent frames are set to
