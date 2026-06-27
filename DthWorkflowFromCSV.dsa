@@ -4,11 +4,9 @@
 var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
 include (dir_self.filePath ("DthWorkflow.dsa"));
 
+// No ROM loading — apply morphs from your FrameData JSON(s) only, from frame 0.
 options.bIncludeJCM = false;
 options.bIncludeDK = false;
-options.extraJSONs = [dir_self.filePath ("Genesis9g_v4.json")  ];
-	// [dir_self.filePath ("ScannedFrames.json"),  //  ];
-	//dir_self.filePath ("DK9.json"), // ];
-	//dir_self.filePath ("FBMs.json")];
+options.extraJSONs = [dir_self.filePath ("ElectraG9_FBMs.json")];
 
 ApplyDTHWorkflow(options);
