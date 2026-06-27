@@ -9,9 +9,9 @@ options.sPathDthPoses = "D:\\DDaz3DLibrary\\DazToHue\\Poses\\";
 options.scannedCSV = dir_self.filePath ("OUT.csv");
 options.successCSV = dir_self.filePath ("OUT_success.csv");
 options.failCSV = dir_self.filePath ("OUT_failed.csv");
-options.extraJSONs = [dir_self.filePath ("DK9.json"),
-	dir_self.filePath ("FBMs.json")
-	];
+// Your custom FBM / expression / corrective morphs (FrameData JSON, see README).
+// Add your own file(s) here; ElectraG9_FBMs.json is a minimal worked example.
+options.extraJSONs = [dir_self.filePath ("ElectraG9_FBMs.json")];
 
 // This operation is undo-able. 
 ApplyDTHWorkflow(options);
