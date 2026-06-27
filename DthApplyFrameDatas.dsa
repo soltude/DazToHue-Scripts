@@ -1,0 +1,33 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+
+// DthUtils.dsa must exist in the same folder as this script
+var dir_self = new DzDir (new DzFileInfo (getScriptFileName ()).path ());
+include (dir_self.filePath ("DthUtils.dsa"));
+
+CSV_FILE = dir_self.filePath("Genesis9t.csv");
+// Frame numbers from the CSV correspond to frame numbers in the Daz timeline. 
+START_FRAME = 723;
+
+// var morphConfigs = SimonWmMorphs.map(parseMorphConfig);
+var morphConfigs = [];
+var frameDatas = [];
+var successFrameDatas = {}; 
+var failedFrameDatas = {};
+
+readPropsCSV(CSV_FILE, frameDatas, 0);
+
+beginUndo();
+
+
+// for(var k in morphConfigs)
+// 	print(morphConfigs[k]["name"], morphConfigs[k]["value"]);
+
+oNode = Scene.getPrimarySelection();
+if(oNode)
+{
+	applyFrameDatas(oNode, frameDatas, {}, {}, START_FRAME);
+	// createMorphFrames(oNode, morphConfigs, Scene.getTime() / Scene.getTimeStep());
+}
+
+acceptUndo("Create Morph Frames");

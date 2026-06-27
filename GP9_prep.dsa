@@ -1,0 +1,224 @@
+// DAZ Studio version 4.22.0.16 filetype DAZ Script
+
+
+include ("./DthUtils.dsa");
+
+print(loadDufToNode);
+
+var timeStep = Scene.getTimeStep();
+
+
+// Get the primary selection
+var oNode = Scene.getPrimarySelection();
+// If nothing is selected
+if( !oNode ){
+	// We are done...
+	return;
+}
+var oScript;
+var oContentMgr = App.getContentMgr();
+var sGpPath = "D:\\DDaz3DLibrary\\People\\Genesis 9\\Anatomy\\Golden Palace\\"
+var sNipPath = "D:\\DDaz3DLibrary\\People\\Genesis 9\\Anatomy\\Rendorgal\\RDGL Nipples\\";
+//var sFile = sGpPath + "1-G9 Selector.dse";
+
+/******************************************************/
+var oScriptSelectG9 = new DzScript();
+oScriptSelectG9.loadFromFile(sGpPath + "1-G9 Selector.dse");
+oScriptSelectG9.execute();
+
+var oNodeG9 = Scene.getPrimarySelection();
+if( !oNodeG9 ){
+	return;
+}
+
+
+/******************************************************/
+loadDufToNode(oNodeG9, sNipPath + "Add Nipples.duf", "RDGL Nipples");
+
+
+/******************************************************/
+
+loadDufToNode(oNodeG9, sGpPath + "2a-Golden Palace Smart_Vanilla.duf", "GoldenPalace_G9");
+loadDufToNode(oNodeG9, sGpPath + "3-Golden Palace_Material Copy.dse");
+loadDufToNode(oNodeG9, sGpPath + "5_Realistic Default Shape.duf" );
+
+
+Scene.selectAllNodes(false);	
+
+oNodeNipples = oNodeG9.findNodeChildByLabel("RDGL Nipples");
+if (oNodeNipples){
+	print(oNodeNipples.objectName);
+	Scene.setPrimarySelection(oNodeNipples);
+	
+/******************************************************/
+	oScript = new DzScript();
+	print("Loading script: ", "Material Apply.dsa");
+	oScript.loadFromFile(sNipPath + "Material Apply.dsa");
+	oScript.execute();
+
+/******************************************************/
+
+	var oNodeMinora = oNodeG9.findNodeChildByLabel("GoldenPalaceG9_Shell_Minora");
+	if (oNodeMinora){
+		print(oNodeMinora.objectName);
+		Scene.setPrimarySelection(oNodeMinora);
+	}
+
+	var oNodeMajora = oNodeG9.findNodeChildByLabel("GoldenPalaceG9_Shell_Majora");
+	if (oNodeMajora){
+		print(oNodeMajora.objectName);
+		Scene.setPrimarySelection(oNodeMajora);
+	}
+
+	oScript = new DzScript();
+	print("Loading script: ", "4_Shell Fix Omni.dsa");
+	oScript.loadFromFile(sGpPath + "4_Shell Fix Omni.dsa");
+	oScript.execute();
+
+
+} else {
+	print("no nipples");
+}
+
+function loadDufToNode(oNodeRoot, sDufPath, sChildLabel){
+	var oChildNode;
+	if(sChildLabel) 
+		oChildNode = oNodeRoot.findNodeChildByLabel(sChildLabel);
+	if(!oChildNode){
+		Scene.setPrimarySelection(oNodeRoot);
+		print("Loading DUF: ", sDufPath, "to add", sChildLabel, "to node", oNodeRoot.getLabel(), "...");
+		if( oContentMgr.openFile(sDufPath) ) {
+			print("Successfully loaded");
+			return true;
+		} else {
+			print("Failed to load DUF: ", sDufPath, "to add", sChildLabel, "to node", oNodeRoot.getLabel(), "...");
+			return false;
+		}
+	} else {
+		print(sChildLabel, "already exists on node:", oNodeRoot.getLabel());
+		return true;
+	}
+}
+
+//var oNodeMinora = oNodeG9.findNodeChildByLabel("GoldenPalaceG9_Shell_Minora");
+//if(!oNodeMinora){
+//
+//
+//	print("Loading DUF: ", "2a-Golden Palace Smart_Vanilla.duf");
+//	oContentMgr.openFile(sGpPath + "2a-Golden Palace Smart_Vanilla.duf");
+//	
+//	/******************************************************/
+//	print("Loading DUF: ", "5_Realistic Default Shape.duf");
+//	oContentMgr.openFile(sGpPath + "5_Realistic Default Shape.duf");
+//	
+//	/******************************************************/
+//	oScript = new DzScript();
+//	print("Loading script: ", "3-Golden Palace_Material Copy.dse");
+//	oScript.loadFromFile(sGpPath + "3-Golden Palace_Material Copy.dse");
+//	oScript.execute();
+//}
+
+
+/******************************************************/
+
+
+
+
+/*
+var oPropertyGroupTree = oNode.getPropertyGroups();
+var oProperties = oPropertyGroupTree.getAllProperties();
+
+var a = 0;	
+var aInitialPropValues = {};
+aInitialPropValues["a"] = 1;
+print(aInitialPropValues);
+
+var aPropList = [];
+
+for( var i in oProperties){
+	
+	var oProperty = oProperties[i];
+	if(oProperty && oProperty.canAnimate && oProperty.getValue && oProperty.inherits("DzNumericProperty"))
+	 //&& !oProperty.currentValueIsDefaultValue()
+	{	
+		//printPropertyInfo( oProperty );
+		//print(oProperty.className());
+		//print(oProperty.getValue());		
+		aPropList = aPropList.concat(oProperty);
+		a += 1;
+	}
+	
+}
+
+//print(aPropList);
+
+print("aPropList length:", aPropList.length);
+
+var t;
+var aChanged = [];
+for( var i = 3; i < 100; i++ ) {
+	t = i * timeStep;
+	aChanged[i] = [];
+	for( var j = 0; j < aPropList.length; j++ ) {
+		//print(j);
+		if( aPropList[j].getValue(0) != aPropList[j].getValue(t)) 
+			aChanged[i] = aChanged[i].concat(j);
+	}
+}
+
+for(var i in aChanged){
+	var tmp = [];
+	for(var j in aChanged[i]){
+		prop = aPropList[aChanged[i][j]];
+		if(prop)
+			tmp = tmp.concat(prop.getLabel());
+	}
+	print(i, tmp);
+}
+
+function buildRestPropList(){
+	
+}
+
+print(a);
+*/
+/*
+
+// Define what we are looking for
+var sPropertyName = "SubDAlgorithmControl";
+var sPropertyPath = "General/Mesh Resolution";
+
+// Initialize a list of properties
+var aProperties = [];
+
+// Declare working variable
+var oProperty;
+// If a property name is defined
+if( !sPropertyName.isEmpty() ){
+	// Find the property by name on the node
+	oProperty = findElementProperty( oNode, sPropertyName, false );
+	// If the property is found
+	if( oProperty ){
+		// Collect the property
+		aProperties.push( oProperty );
+	}
+// If a property path is defined
+} else if( !sPropertyPath.isEmpty() ){
+	// Collect the properties at the specified path on the node
+	aProperties = aProperties.concat( getElementPropertiesInPath( oNode, sPropertyPath, true ) );
+// If neither a property name nor a property path is defined
+} else {
+	// Collect the properties on the node
+	aProperties = aProperties.concat( getElementProperties( oNode, true, true ) );
+}
+
+// Iterate over the collected properties
+for( var i = 0; i < aProperties.length; i += 1 ){
+	// Get the 'current' property
+	oProperty = aProperties[ i ];
+	
+	// Print information about the property
+	printPropertyInfo( oProperty );
+}
+
+/**/
