@@ -373,6 +373,13 @@ function processFrameDataJSON(jsonData, frameDatas, iOffset, gpArtData, dkArtDat
 	for (var i = 0; i < jsonData.frames.length; i++) {
 		var frameEntry = jsonData.frames[i];
 		var frameNum = parseInt(frameEntry.frame) + iOffset;
+		// A bad frame number must not silently shorten the timeline (frame drift
+		// vs the Houdini side) — report it and skip just this entry; every valid
+		// frame keeps its slot.
+		if (isNaN(frameNum) || frameNum < 0) {
+			print("ERROR: frame entry", i, "('" + (frameEntry.name || "") + "') has an invalid frame number:", frameEntry.frame);
+			continue;
+		}
 
 		if (!frameDatas[frameNum]) {
 			frameDatas[frameNum] = {
@@ -516,8 +523,10 @@ function createMorphFrames( oNode, morphConfigs, iStartFrame){
 				oProp = getMorphPropFromNode(oNode, config.name)
 			}
 			if(!oProp){
+				// continue (NOT break): one missing morph must not drop the rest
+				// of this frame's morphs — the frame slot and count stay intact.
 				print("property ", config.name, " not found on node", oNode.getLabel());
-				break; 
+				continue;
 			}
 			fValue = config.value || 1;
 			var success = createMorphFrame(oProp, iStartFrame + i, fValue);
