@@ -17,6 +17,11 @@ var options = {
 	// Offsets for the fence poses, relative to the first frame of the DK9 ROM file
 	aDK9FenceOffsets: [0, 33, 46, 47, 49, 52],
 	bDQS: false,// set true to enable Dual Quat Skinning, defaults to linear
+	// Preset ROM block lengths in frames, e.g. { base: 328, gp: 104, dk: 54, phys: 43 }.
+	// Null uses the stock DTH G9 asset lengths (base: DQS 328 / Linear 617).
+	// Set this when your base ROM is a custom asset with a different frame count -
+	// the workflow sizes each timeline block from these.
+	presetFrames: null,
 	FACsDetailStrength: 1.0,
 	FlexionStrength: 1.0,
 	extraJSONs: [],

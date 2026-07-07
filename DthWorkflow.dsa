@@ -182,33 +182,57 @@ function ApplyInitialValues(options, oNodeRoot){
 }
 
 
+// The length of a preset ROM block ("base"/"gp"/"dk"/"phys") in frames. Callers
+// (e.g. DTH Character Studio, or your own wrapper) can pass measured lengths via
+// options.presetFrames - needed when a custom base ROM has a non-stock frame
+// count, or if a future release changes an asset's length. Without an override
+// the stock DTH G9 asset lengths below are used.
+function getPresetFrameCount(options, sKey){
+	var pf = options["presetFrames"];
+	if( pf && typeof pf[sKey] == "number" && pf[sKey] > 0 ){
+		return pf[sKey];
+	}
+	// Stock DTH G9 asset lengths.
+	if( sKey == "base" ) return options["bDQS"] ? 328 : 617;
+	if( sKey == "gp" )   return 104;
+	if( sKey == "dk" )   return 54;
+	if( sKey == "phys" ) return 43;
+	print("Unknown preset ROM block:", sKey);
+	return -1;
+}
+
+
 function ApplyDefaultROMs(options, oNodeRoot, oNodeMouth){
 
 	var ROMs = getRomPaths(options);
 	var sJcmROM = ROMs[0];
 	var sMouthROM = ROMs[1];
-	var iRomFrames = options["bDQS"] ? 328 : 617;
+	var iRomFrames = getPresetFrameCount(options, "base");
+	if( iRomFrames < 0 ) return false;
 
 	print("Loading JCM ROM: ", sJcmROM);
 	setTotalFrames(iRomFrames);
-	if( loadPreset(sJcmROM, oNodeRoot) ){
-		print("Successfully loaded pose preset.");
-
-		if( options["bIncludeFAC"] ){
-			print("Loading Mouth ROM: ", sMouthROM);
-			setTotalFrames(iRomFrames);
-			if(loadPreset(sMouthROM,  oNodeMouth) ){
-				print("Successfully loaded pose preset.");
-				return true;
-		} else {
-				print("Failed loading ROM:", sMouthROM);
-			}
-		}
-	} else {
+	if( !loadPreset(sJcmROM, oNodeRoot) ){
 		print("Failed loading ROM:", sJcmROM);
 		print("This is a necessary step. Aborting script.");
+		return false;
 	}
-	return false;
+	print("Successfully loaded pose preset.");
+
+	// FAC is optional: without it (e.g. a custom JCM base with FAC disabled) the
+	// base ROM alone IS a successful load. The old flow only returned true from
+	// inside this branch, so JCM-without-FAC fell through to `return false` and
+	// silently aborted the whole workflow after loading the base.
+	if( options["bIncludeFAC"] ){
+		print("Loading Mouth ROM: ", sMouthROM);
+		setTotalFrames(iRomFrames);
+		if( !loadPreset(sMouthROM, oNodeMouth) ){
+			print("Failed loading ROM:", sMouthROM);
+			return false;
+		}
+		print("Successfully loaded pose preset.");
+	}
+	return true;
 }
 
 
@@ -227,8 +251,10 @@ function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
 	//   - shipped DK9_ArtDirection.json is circumcised-only; the uncircumcised foreskin
 	//     path (DK9.csv frames 34-45 + foreskin-anchored fences) is unmodeled.
 	// ---------------------------------------------------------------------------
-	// DK9 ROM is 54 frames (offsets 0-53)
-	var dk9FrameCount = 54;
+	// DK9 ROM length - measured/overridable via options.presetFrames (stock
+	// DK9.csv is 54 frames, offsets 0-53).
+	var dk9FrameCount = getPresetFrameCount(options, "dk");
+	if( dk9FrameCount < 0 ) return false;
 	var totalFrames = startFrame + dk9FrameCount;
 
 	print("Setting fence pose for", oNodeRoot.objectName, "from frame", 0, "to", startFrame);
@@ -263,8 +289,10 @@ function ApplyDK9(options, oNodeRoot, oNodeDk9, startFrame){
 
 
 function ApplyPhysics(options, oNodeRoot, startFrame){
-	// Physics example ROM has 43 frames (offsets 0-42)
-	var physFrameCount = 43;
+	// Physics ROM length - measured/overridable via options.presetFrames (stock
+	// example is 43 frames, offsets 0-42).
+	var physFrameCount = getPresetFrameCount(options, "phys");
+	if( physFrameCount < 0 ) return false;
 	setTotalFrames(startFrame + physFrameCount);
 
 	var sPhysROM = options["physRomPath"] ? options["physRomPath"] : ROM_PHYS;
@@ -281,16 +309,17 @@ function ApplyPhysics(options, oNodeRoot, startFrame){
 
 
 function ApplyGP9(options, oNodeRoot, oNodeGP, startFrame){
-	// The GP ROM is 104 frames (rel 0-103). gpFrameCount = 104 reserves the whole
-	// block so the NEXT section starts at rel 104 - the frame after ClitorisErect -
-	// matching DK (dk9FrameCount = its full 54 frames). This is the 0-based Daz
-	// convention: timeline frame 0 is the first frame, and a section's frame 0 is its
-	// first frame, so a loadPreset ROM block (Physics) AND a 0-based extraJSONs
-	// section both land cleanly at rel 104. Verified against a real ElectraG9
-	// PoseAsset export: ClitorisErect at abs 431, FBM BodyTone at abs 432 (= 432 + 0).
-	// IMPORTANT: extraJSONs MUST be 0-based (first frame = 0). The older 103 handoff
-	// only worked because the JSONs were 1-based, which silently masked the overlap.
-	var gpFrameCount = 104;
+	// The GP block's length reserves the whole block so the NEXT section starts at
+	// the frame after the last GP pose (ClitorisErect) - matching DK (its full
+	// length). This is the 0-based Daz convention: timeline frame 0 is the first
+	// frame, and a section's frame 0 is its first frame, so a loadPreset ROM block
+	// (Physics) AND a 0-based extraJSONs section both land cleanly at the block end.
+	// Verified against a real ElectraG9 export (stock 104-frame GP): ClitorisErect
+	// at abs 431, FBM BodyTone at abs 432 (= 432 + 0).
+	// IMPORTANT: extraJSONs MUST be 0-based (first frame = 0). The older off-by-one
+	// handoff only worked because the JSONs were 1-based, which silently masked it.
+	var gpFrameCount = getPresetFrameCount(options, "gp");
+	if( gpFrameCount < 0 ) return false;
 	var totalFrames = startFrame + gpFrameCount;
 
 	// Set total frames before loading preset
@@ -341,7 +370,7 @@ function ApplyDTHCharacter(config){
 	// Override the shared defaults with whatever the character config supplies.
 	var keys = [
 		"bIncludeJCM", "bIncludeFAC", "bIncludeDK", "bIncludeGP", "bIncludePhysics", "bDQS",
-		"FACsDetailStrength", "FlexionStrength",
+		"FACsDetailStrength", "FlexionStrength", "presetFrames",
 		"jcmRomPath", "mouthRomPath", "gpRomPath", "dkRomPath", "physRomPath",
 		"aGPFenceOffsets", "aDK9FenceOffsets",
 		"preserveMorphs", "preserveNodeTransforms", "jcmMorphMods"
