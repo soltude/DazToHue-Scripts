@@ -11,11 +11,30 @@ function verbose(){
 	}
 }
 /**********************************************************************
-**********               */
+ * DAZ Studio 6 detection (JoxiMoon's field-tested 3-tier pattern, trimmed to
+ * the version APIs — no material at hand here for feature detection; with no
+ * version API at all we assume DS4-era, whose Linear keys are correct). */
+function dthDetectDaz6(){
+	if (typeof App != "undefined" && typeof App.versionString == "string") {
+		return App.versionString.indexOf("6.") == 0;
+	}
+	if (typeof App != "undefined" && typeof App.getVersionString == "function") {
+		return App.getVersionString().indexOf("6.") == 0;
+	}
+	return false;
+}
+var DTH_IS_DAZ6 = dthDetectDaz6();
+
+/**********************************************************************
+ * Stamp the ROM's morph keys with the interpolation the running Daz needs:
+ * LINEAR on DS4 (the validated original behavior), CONSTANT on DS6 — DS6's
+ * animation engine drifts Linear-interpolated ROM keys across the timeline
+ * (mrpdean, June 2026: "G9 DQS JCM FAC" cheek poses creeping); converting
+ * every key to Constant after applying is his validated workaround. */
 function setLinearInterp(oNodes, startFrame, endFrame){
 
-	// Set default to linear interpolation off the bat, so hopefully it doesn't need to be set later
-	Scene.setDefaultKeyInterpolationType(DzProperty.Linear);
+	// Set the session default to match, so keys created later start out right.
+	Scene.setDefaultKeyInterpolationType(DTH_IS_DAZ6 ? DzProperty.Constant : DzProperty.Linear);
 
  	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
  	endFrame = typeof endFrame !== 'undefined' ? endFrame : 0;
@@ -35,10 +54,10 @@ function setLinearInterp(oNodes, startFrame, endFrame){
 		if(oObj){
 			for(var i=0; i<oObj.getNumModifiers(); i++)
 			{
-				oMod = oObj.getModifier(i);
+				var oMod = oObj.getModifier(i);
 				if(oMod && oMod.inherits("DzMorph"))
 				{
-					oProp = oMod.getValueControl();
+					var oProp = oMod.getValueControl();
 					if(oProp && oProp.getNumKeys() > 1)
 					{
 						props.push(oProp);
@@ -48,12 +67,13 @@ function setLinearInterp(oNodes, startFrame, endFrame){
 		}
 		// Skip node properties entirely - they include Scale/Transform which should never be modified
 	}
-	print("Morph props to set linear interp:", props.length)
+	print("Morph props to set", DTH_IS_DAZ6 ? "CONSTANT" : "LINEAR", "interp:", props.length)
+	var iInterp = DTH_IS_DAZ6 ? DzFloatProperty.CONSTANT_INTERP : DzFloatProperty.LINEAR_INTERP;
 	for( var i = 0; i < props.length; i++){
-		var oProp = props[i];
+		oProp = props[i];
 		for( var j = 0; j < oProp.getNumKeys(); j++) {
 			// Only set interpolation type - do NOT call setValue as it can modify values
-			oProp.setKeyInterpolationType(j, DzFloatProperty.LINEAR_INTERP);
+			oProp.setKeyInterpolationType(j, iInterp);
 		}
 	}
 }
@@ -64,7 +84,7 @@ function setLinearInterp(oNodes, startFrame, endFrame){
 function loadPreset(sFilename, oTarget, startFrame)
 {
  	startFrame = typeof startFrame !== 'undefined' ? startFrame : 0;
- 	oContentMgr = App.getContentMgr();
+ 	var oContentMgr = App.getContentMgr();
 	print("Loading", sFilename, "to", oTarget.getLabel(), "at frame", startFrame);
 	var newTime = Scene.getTimeStep() * startFrame;
 	Scene.selectAllNodes(false);
@@ -80,6 +100,10 @@ function setTotalFrames(iTotalFrames){
 	var oTimeRange = new DzTimeRange(0, iTotalFrames * Scene.getTimeStep());
 	print("Setting new time range:", oTimeRange.start, "to", oTimeRange.end);
 	Scene.setAnimRange(oTimeRange);
+	// Also extend the play range — otherwise the timeline scrubber stays bounded
+	// to the previous (shorter) play range and you can't reach the later frames
+	// (e.g. the FBM section after the GP block).
+	Scene.setPlayRange(oTimeRange);
 }
 
 /**********************************************************************
@@ -99,8 +123,11 @@ function setFencePoses(oNode, iSourceFrame, aTargetFrames){
 	Scene.setPrimarySelection(oNode);
 	Scene.setTime(iSourceFrame * timeStep);
 	print("Memorizing figure for:", oNode.getLabel(), "at frame", iSourceFrame);
-	triggerAction("DzMemorizeFigureAction");	
-	for( var i in aTargetFrames){
+	triggerAction("DzMemorizeFigureAction");
+	// Indexed loop, NOT for-in: DAZ's engine exposes enumerable Array.prototype
+	// extensions (map/forEach/…), so for-in over an array also yields those —
+	// restoring the figure at frame `function f(){…}` (NaN time) and "".
+	for( var i = 0; i < aTargetFrames.length; i++){
 		var frame = aTargetFrames[i];
 		Scene.setTime(frame * timeStep);
 		print("Restoring figure for:", oNode.getLabel(), "at frame", frame);
@@ -116,15 +143,22 @@ function setFencePoses(oNode, iSourceFrame, aTargetFrames){
 function setPropertyByName(oNode, sPropName, fValue, iFrame){
  	iFrame = typeof iFrame !== 'undefined' ? iFrame : 0;
  	print("Setting property", sPropName, "to", fValue, "at frame", iFrame, "...");
-	oProp = oNode.findProperty(sPropName);
-	if (oProp && oProp.setValue(iFrame * Scene.getTimeStep(), fValue, DzProperty.Linear)){
-		print("Succesfully set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
-		return true;
-	} else {
-		print("Failed to set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
+	var oProp = oNode.findProperty(sPropName);
+	if (!oProp){
+		print("Failed to set property", sPropName, "- not found on node", oNode.getLabel());
 		return false;
 	}
-
+	var tFrame = iFrame * Scene.getTimeStep();
+	// setValue returns false when the value is ALREADY fValue (nothing to change),
+	// so don't gate success on its return — verify by reading the value back. This
+	// stops a no-op (e.g. FACS Detail Strength already at 1) logging a false "Failed".
+	oProp.setValue(tFrame, fValue, DzProperty.Linear);
+	if (approx_eq(oProp.getValue(tFrame), fValue)){
+		print("Set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
+		return true;
+	}
+	print("Failed to set property", oProp.getLabel(), "to", fValue, "at frame", iFrame);
+	return false;
 }
 
 
@@ -153,9 +187,11 @@ function getMorphPropFromNode(oNode, sMorphName){
 	var oObj = oNode.getObject();
 	if(oObj)
 	{
-		oMorph = oObj.findModifier(sMorphName);
+		var oMorph = oObj.findModifier(sMorphName);
 		if(oMorph){
-			oProp = oMorph.getValueChannel(0);
+			// getValueChannel() takes no args — passing 0 logs "Too many
+			// arguments, ignoring 1" on every morph (this is the hot path).
+			var oProp = oMorph.getValueChannel();
 			return oProp;
 		}
 	}
@@ -229,6 +265,26 @@ function readPropsCSV(sFilename, frameDatas, iOffset){
 //     }
 //   ]
 // }
+// Reads + parses a sibling art-direction JSON (GP9_ArtDirection.json /
+// DK9_ArtDirection.json) next to the FBM file. Returns the parsed object or null.
+function readArtDirectionSibling(sFilename, sJsonName, sLabel){
+	var oFileInfo = new DzFileInfo(sFilename);
+	var sJsonPath = oFileInfo.path() + "/" + sJsonName;
+	var oFile = new DzFile(sJsonPath);
+	if (!oFile.open(oFile.ReadOnly)) {
+		print("WARNING: Could not open", sJsonName, "at:", sJsonPath);
+		return null;
+	}
+	var sContent = oFile.read();
+	oFile.close();
+	try {
+		return JSON.parse(sContent);
+	} catch (e) {
+		print("ERROR: Failed to parse", sLabel, "art direction (" + sJsonName + "):", e);
+		return null;
+	}
+}
+
 function readFrameDataJSON(sFilename, frameDatas, iOffset){
 	frameDatas = frameDatas || [];
 	iOffset = iOffset || 0;
@@ -250,76 +306,100 @@ function readFrameDataJSON(sFilename, frameDatas, iOffset){
 		return frameDatas;
 	}
 
-	if (!jsonData.frames || !Array.isArray(jsonData.frames)) {
-		print("ERROR: JSON file missing 'frames' array:", sFilename);
+	// The file path reads the sibling GP9/DK9_ArtDirection.json for the reset
+	// (inline callers pass the parsed data straight to processFrameDataJSON).
+	var gpArtData = (jsonData.meta && jsonData.meta.resetGPBeforeApplying === true)
+		? readArtDirectionSibling(sFilename, "GP9_ArtDirection.json", "GP") : null;
+	var dkArtData = (jsonData.meta && jsonData.meta.resetDKBeforeApplying === true)
+		? readArtDirectionSibling(sFilename, "DK9_ArtDirection.json", "DK") : null;
+	return processFrameDataJSON(jsonData, frameDatas, iOffset, gpArtData, dkArtData);
+}
+
+/**
+ * Inject reset keyframes that zero a genital ROM's morphs at the first custom
+ * (FBM) frame, so the GP/DK block's morphs don't leak into the custom poses.
+ * `artData` is the parsed GP9/DK9 art-direction object; its last (highest-frame)
+ * entry carries the morph list to clear. `sLabel` is for logging ("GP"/"DK").
+ * noSawtooth sets 0 only at the FBM start, leaving the block's final pose intact.
+ */
+function resetGenMorphsAtFbmStart(jsonData, frameDatas, iOffset, artData, sLabel){
+	if (!artData || !artData.frames || artData.frames.length === 0) {
+		print("WARNING:", sLabel, "reset requested but no art-direction data - skipping");
+		return;
+	}
+	// The last frame (highest frame number) holds the morphs to reset.
+	var lastFrame = null;
+	var maxFrameNum = -1;
+	for (var g = 0; g < artData.frames.length; g++) {
+		var af = artData.frames[g];
+		if (parseInt(af.frame) > maxFrameNum) {
+			maxFrameNum = parseInt(af.frame);
+			lastFrame = af;
+		}
+	}
+	if (!lastFrame || !lastFrame.morphs || lastFrame.morphs.length === 0) {
+		print("WARNING:", sLabel, "art direction last frame has no morphs - nothing to reset");
+		return;
+	}
+	// First frame of this FBM block = where we anchor the reset.
+	var minFrame = Number.MAX_VALUE;
+	for (var f = 0; f < jsonData.frames.length; f++) {
+		var fn = parseInt(jsonData.frames[f].frame);
+		if (fn < minFrame) minFrame = fn;
+	}
+	var firstFrameNum = minFrame + iOffset;
+	for (var m = 0; m < lastFrame.morphs.length; m++) {
+		var morph = lastFrame.morphs[m];
+		addFrameData(frameDatas, {
+			frameIdx: firstFrameNum,
+			nodeName: morph.node,
+			propName: morph.prop,
+			propValue: 0,
+			baseValue: 0,
+			noSawtooth: true  // set 0 here only; don't sawtooth the previous frame
+		});
+		verbose("Reset", sLabel, "morph before applying:", morph.prop, "at frame", firstFrameNum);
+	}
+	print("Reset", lastFrame.morphs.length, sLabel, "morphs at FBM start frame", firstFrameNum);
+}
+
+/**
+ * Process an already-parsed frame-data object (same shape as the *_FBMs.json
+ * files) into `frameDatas`. Split out of readFrameDataJSON so callers can pass
+ * the data inline (DTH Character Studio's single-file script) instead of a file.
+ * `gpArtData` / `dkArtData` (optional) are the parsed GP9 / DK9 art-direction
+ * objects used for the reset; pass null to skip a given block's reset.
+ */
+function processFrameDataJSON(jsonData, frameDatas, iOffset, gpArtData, dkArtData){
+	frameDatas = frameDatas || [];
+	iOffset = iOffset || 0;
+
+	if (!jsonData || !jsonData.frames || !Array.isArray(jsonData.frames)) {
+		print("ERROR: frame data missing 'frames' array");
 		return frameDatas;
 	}
 
-	// Handle resetGPBeforeApplying - reset GP morphs at FBM start to prevent leakage
-	if (jsonData.meta && jsonData.meta.resetGPBeforeApplying === true) {
-		var oFileInfo = new DzFileInfo(sFilename);
-		var gpJsonPath = oFileInfo.path() + "/GP9_ArtDirection.json";
-
-		var gpFile = new DzFile(gpJsonPath);
-		if (gpFile.open(gpFile.ReadOnly)) {
-			var gpContent = gpFile.read();
-			gpFile.close();
-
-			try {
-				var gpData = JSON.parse(gpContent);
-				if (gpData.frames && gpData.frames.length > 0) {
-					// Find the last frame (highest frame number)
-					var lastFrame = null;
-					var maxFrameNum = -1;
-					for (var g = 0; g < gpData.frames.length; g++) {
-						var gf = gpData.frames[g];
-						if (parseInt(gf.frame) > maxFrameNum) {
-							maxFrameNum = parseInt(gf.frame);
-							lastFrame = gf;
-						}
-					}
-
-					if (lastFrame && lastFrame.morphs && lastFrame.morphs.length > 0) {
-						// Find minimum frame in this FBM JSON for reset point
-						var minFrame = Number.MAX_VALUE;
-						for (var f = 0; f < jsonData.frames.length; f++) {
-							var fn = parseInt(jsonData.frames[f].frame);
-							if (fn < minFrame) minFrame = fn;
-						}
-						var firstFrameNum = minFrame + iOffset;
-
-						// Add reset keyDatas for each morph from GP last frame
-						// Use noSawtooth flag to prevent overwriting the previous frame's value
-						for (var m = 0; m < lastFrame.morphs.length; m++) {
-							var gpMorph = lastFrame.morphs[m];
-							var keyData = {
-								frameIdx: firstFrameNum,
-								nodeName: gpMorph.node,
-								propName: gpMorph.prop,
-								propValue: 0,
-								baseValue: 0,
-								noSawtooth: true  // Don't use sawtooth pattern for reset
-							};
-							addFrameData(frameDatas, keyData);
-							verbose("Reset GP morph before applying:", gpMorph.prop, "at frame", firstFrameNum);
-						}
-						print("Reset", lastFrame.morphs.length, "GP morphs from frame", lastFrame.name, "at FBM start frame", firstFrameNum);
-					} else {
-						print("WARNING: GP9 last frame has no morphs defined - nothing to reset");
-					}
-				}
-			} catch (e) {
-				print("ERROR: Failed to parse GP9_ArtDirection.json:", e);
-			}
-		} else {
-			print("WARNING: Could not open GP9_ArtDirection.json at:", gpJsonPath);
-		}
+	// Reset the active genital ROM's morphs at the FBM start to prevent leakage.
+	// The studio emits both flags from one generic option; only the block whose
+	// art-direction data is actually present (GP for female, DK for male) resets.
+	if (jsonData.meta && jsonData.meta.resetGPBeforeApplying === true && gpArtData) {
+		resetGenMorphsAtFbmStart(jsonData, frameDatas, iOffset, gpArtData, "GP");
+	}
+	if (jsonData.meta && jsonData.meta.resetDKBeforeApplying === true && dkArtData) {
+		resetGenMorphsAtFbmStart(jsonData, frameDatas, iOffset, dkArtData, "DK");
 	}
 
 	var frameCount = 0;
 	for (var i = 0; i < jsonData.frames.length; i++) {
 		var frameEntry = jsonData.frames[i];
 		var frameNum = parseInt(frameEntry.frame) + iOffset;
+		// A bad frame number must not silently shorten the timeline (frame drift
+		// vs the Houdini side) — report it and skip just this entry; every valid
+		// frame keeps its slot.
+		if (isNaN(frameNum) || frameNum < 0) {
+			print("ERROR: frame entry", i, "('" + (frameEntry.name || "") + "') has an invalid frame number:", frameEntry.frame);
+			continue;
+		}
 
 		if (!frameDatas[frameNum]) {
 			frameDatas[frameNum] = {
@@ -337,16 +417,57 @@ function readFrameDataJSON(sFilename, frameDatas, iOffset){
 					nodeName: morph.node,
 					propName: morph.prop,
 					propValue: parseFloat(morph.value),
-					baseValue: (morph.base !== undefined) ? parseFloat(morph.base) : 0
+					baseValue: (morph.base !== undefined) ? parseFloat(morph.base) : 0,
+					autoBase: (morph.autoBase === true)
 				};
 				addFrameData(frameDatas, keyData);
-				verbose("add JSON frame data. frame:", frameNum, "prop:", morph.prop, "base:", keyData.baseValue);
+				verbose("add JSON frame data. frame:", frameNum, "prop:", morph.prop, "base:", keyData.baseValue, "autoBase:", keyData.autoBase);
 			}
 		}
 		frameCount++;
 	}
-	print("added", frameCount, "JSON frames from:", sFilename);
+
+	// Optional `groups` array: frame ranges whose generation method needs a
+	// differently shaped timeline (additive: the first pose sustains across
+	// the group; cumulative: every pose sustains until the group end).
+	if (jsonData.groups && Array.isArray(jsonData.groups)) {
+		annotateGroupMethods(frameDatas, jsonData.groups, iOffset);
+	}
+
+	print("added", frameCount, "frames from frame data");
 	return frameDatas;
+}
+
+
+/** Marks the keyDatas of additive/cumulative group ranges so applyKeyData
+ *  can create sustained keys instead of the per-frame sawtooth.
+ *  advancedAdditive shapes the timeline like additive (the distinction is
+ *  Houdini-side). Props repeating within a cumulative group are ramps
+ *  (e.g. AnusOpen 22/35/80) — they skip the base re-anchor before their frame. */
+function annotateGroupMethods(frameDatas, groups, iOffset){
+	for (var g = 0; g < groups.length; g++) {
+		var group = groups[g];
+		var method = group.method === "advancedAdditive" ? "additive" : group.method;
+		if (method !== "additive" && method !== "cumulative") continue;
+		var startFrame = parseInt(group.startFrame) + iOffset;
+		var endFrame = parseInt(group.endFrame) + iOffset;
+		var seenProps = {};
+		for (var f = startFrame; f <= endFrame; f++) {
+			var frameData = frameDatas[f];
+			if (!frameData || !frameData.keyDatas) continue;
+			for (var k = 0; k < frameData.keyDatas.length; k++) {
+				var keyData = frameData.keyDatas[k];
+				var propKey = keyData.nodeName + "|" + keyData.propName;
+				keyData.groupMethod = method;
+				keyData.groupStart = startFrame;
+				keyData.groupEnd = endFrame;
+				keyData.isGroupBase = (f === startFrame);
+				keyData.rampContinuation = (seenProps[propKey] === true);
+				seenProps[propKey] = true;
+			}
+		}
+		print("annotated", method, "group", (group.name || ""), "frames", startFrame, "-", endFrame);
+	}
 }
 
 function printCSV(frameDatas, sOutFilename){
@@ -422,8 +543,10 @@ function createMorphFrames( oNode, morphConfigs, iStartFrame){
 				oProp = getMorphPropFromNode(oNode, config.name)
 			}
 			if(!oProp){
+				// continue (NOT break): one missing morph must not drop the rest
+				// of this frame's morphs — the frame slot and count stay intact.
 				print("property ", config.name, " not found on node", oNode.getLabel());
-				break; 
+				continue;
 			}
 			fValue = config.value || 1;
 			var success = createMorphFrame(oProp, iStartFrame + i, fValue);
@@ -465,7 +588,7 @@ function resetFrameDatasAtFrame(oNodeRoot, frameDatas, resetFrame){
 							for(var m = 0; m < oObj.getNumModifiers(); m++){
 								var mod = oObj.getModifier(m);
 								if(mod.getLabel() === keyData.propName || mod.getName() === keyData.propName){
-									if(mod.getValueChannel) oProp = mod.getValueChannel(0);
+									if(mod.getValueChannel) oProp = mod.getValueChannel();
 									if(!oProp && mod.getValueControl) oProp = mod.getValueControl();
 									if(oProp) break;
 								}
@@ -474,16 +597,70 @@ function resetFrameDatasAtFrame(oNodeRoot, frameDatas, resetFrame){
 					}
 
 					if(oProp){
-						// Set to 0 at reset frame
-						oProp.setValue(resetFrame * timeStep, 0);
+						// Use baseValue for reset (respects pre-existing morph values)
+						var resetValue = (keyData.baseValue !== undefined) ? keyData.baseValue : 0;
+						oProp.setValue(resetFrame * timeStep, resetValue);
 						processedProps[keyData.propName] = true;
-						verbose("Reset", keyData.propName, "to 0 at frame", resetFrame);
+						verbose("Reset", keyData.propName, "to", resetValue, "at frame", resetFrame);
 					}
 				}
 			}
 		}
 	}
-	print("Reset", Object.keys(processedProps).length, "morphs to 0 at frame", resetFrame);
+	print("Reset", Object.keys(processedProps).length, "morphs at frame", resetFrame);
+}
+
+
+/** Resolves autoBase flags in frameDatas by reading current property values from the scene.
+ *  Must be called before applyFrameDatas so that baseValue reflects the scene state. */
+function resolveAutoBaseValues(oNodeRoot, frameDatas){
+	var resolved = 0;
+	for(var i = 0; i < frameDatas.length; i++){
+		var frameData = frameDatas[i];
+		if(frameData && frameData.keyDatas){
+			for(var j = 0; j < frameData.keyDatas.length; j++){
+				var keyData = frameData.keyDatas[j];
+				if(!keyData.autoBase) continue;
+
+				// Find the node
+				var oNode;
+				if(oNodeRoot.getName() == keyData.nodeName || oNodeRoot.getLabel() == keyData.nodeName)
+					oNode = oNodeRoot;
+				else
+					oNode = oNodeRoot.findNodeChild(keyData.nodeName, true);
+				if(!oNode)
+					oNode = oNodeRoot.findNodeChildByLabel(keyData.nodeName, true);
+
+				if(oNode){
+					var oProp = getMorphPropFromNode(oNode, keyData.propName);
+					if(!oProp){
+						var oObj = oNode.getObject();
+						if(oObj){
+							for(var m = 0; m < oObj.getNumModifiers(); m++){
+								var mod = oObj.getModifier(m);
+								if(mod.getLabel() === keyData.propName || mod.getName() === keyData.propName){
+									if(mod.getValueChannel) oProp = mod.getValueChannel();
+									if(!oProp && mod.getValueControl) oProp = mod.getValueControl();
+									if(oProp) break;
+								}
+							}
+						}
+					}
+
+					if(oProp){
+						// Read the current value at time 0 (base state)
+						var currentValue = oProp.getValue(0);
+						keyData.baseValue = currentValue;
+						print("autoBase resolved:", keyData.propName, "current value:", currentValue);
+						resolved++;
+					}
+				}
+				// Clear the flag so it's not re-processed
+				keyData.autoBase = false;
+			}
+		}
+	}
+	if(resolved > 0) print("Resolved", resolved, "autoBase morph values from scene");
 }
 
 
@@ -549,7 +726,7 @@ function applyKeyData(oNodeRoot, keyData, overrideFrameIdx){
 					if(mod.getLabel() === keyData.propName || mod.getName() === keyData.propName){
 						// Try different methods to get the value property
 						if(mod.getValueChannel){
-							oProp = mod.getValueChannel(0);
+							oProp = mod.getValueChannel();
 						}
 						if(!oProp && mod.getValueControl){
 							oProp = mod.getValueControl();
@@ -577,6 +754,10 @@ function applyKeyData(oNodeRoot, keyData, overrideFrameIdx){
 		}
 
 		if(oProp){
+			// DAZ Studio 6 pops a "keep limits?" dialog when a value exceeds the
+			// property's min/max. Disable clamping on this property so the morph
+			// applies without any prompt (guarded — the method name may differ).
+			if(typeof oProp.setIsClamped === "function") oProp.setIsClamped(false);
 			//var iKey = oProp.getNumKeys();
 			//*********** Main action - create the morph frame;
 			// if(createMorphFrameByKey(oProp, keyData.frameIdx, keyData.propValue, iKey)){
@@ -589,6 +770,20 @@ function applyKeyData(oNodeRoot, keyData, overrideFrameIdx){
 				oProp.setValue(frameIdx * timeStep, keyData.propValue);
 				verbose("Set value (no sawtooth) on", keyData.nodeName, "prop:", keyData.propName, "=", keyData.propValue, "at frame", frameIdx);
 				return true;
+			}
+
+			// Additive/cumulative groups: the value sustains until the group
+			// end instead of sawtoothing back on the next frame. For additive
+			// only the base (first) pose sustains; the rest sawtooth normally.
+			if (keyData.groupMethod === "cumulative" ||
+				(keyData.groupMethod === "additive" && keyData.isGroupBase)) {
+				if (createSustainedMorphFrame(oProp, frameIdx, keyData.propValue, baseValue,
+						keyData.groupEnd, keyData.rampContinuation === true)) {
+					verbose("Successfully created sustained morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
+					return true;
+				}
+				print("Failed to create sustained morph frame on", keyData.nodeName, "prop:", keyData.propName, keyData.propValue);
+				return false;
 			}
 
 			if(createMorphFrame(oProp, frameIdx, keyData.propValue, baseValue)){
@@ -651,6 +846,40 @@ function createMorphFrameByKey( oProperty, iFrame, fValue, iKey){
 // Creates a sawtooth keyframe pattern: adjacent frames are set to fBaseValue,
 // target frame is set to fValue. This prevents morph value leakage.
 // fBaseValue defaults to 0 if not specified.
+/* Creates a morph frame whose value SUSTAINS until the end of its group
+** instead of sawtoothing back on the next frame — for additive base poses
+** and cumulative group members (Custom ROM Guide generation methods).
+**
+** Keys: base at iFrame-1 (skipped for ramp continuations of the same prop,
+** e.g. AnusOpen 22/35/80), value at iFrame, value held at iGroupEnd, base
+** released at iGroupEnd+1.
+*/
+function createSustainedMorphFrame( oProperty, iFrame, fValue, fBaseValue, iGroupEnd, bRampContinuation ){
+	if( !oProperty ){
+		print("Error: Property is null.");
+		return false;
+	}
+	if( !oProperty.inherits("DzFloatProperty")){
+		print("Error: Property is not a DzFloatProperty.");
+		return false;
+	}
+	fBaseValue = (fBaseValue !== undefined) ? fBaseValue : 0;
+
+	var timeStep = Scene.getTimeStep();
+	if (!bRampContinuation) {
+		oProperty.setValue((iFrame - 1) * timeStep, fBaseValue);
+		verbose("Property", oProperty.getLabel(), "set at frame", iFrame - 1, "to", fBaseValue);
+	}
+	oProperty.setValue(iFrame * timeStep, fValue);
+	if (iGroupEnd > iFrame) {
+		oProperty.setValue(iGroupEnd * timeStep, fValue);
+	}
+	oProperty.setValue((iGroupEnd + 1) * timeStep, fBaseValue);
+	verbose("Set sustained morph frame for", oProperty.getLabel(), "at frame", iFrame, "to", fValue, "held until", iGroupEnd);
+	return true;
+}
+
+
 function createMorphFrame( oProperty, iFrame, fValue, fBaseValue ){
 	if( !oProperty ){
 		print("Error: Property is null.");
@@ -894,7 +1123,7 @@ function resolveMorphProps(oNodeRoot, morphEntries) {
                         var mod = oObj.getModifier(m);
                         if (mod.getLabel() === name || mod.getName() === name) {
                             if (mod.getValueChannel) {
-                                oProp = mod.getValueChannel(0);
+                                oProp = mod.getValueChannel();
                             }
                             if (!oProp && mod.getValueControl) {
                                 oProp = mod.getValueControl();
@@ -1227,9 +1456,14 @@ function applyGPArtDirection(sJsonPath, oNodeRoot, startFrame) {
         print("ERROR: Failed to parse GP art direction JSON:", e);
         return false;
     }
+    return applyArtDirectionData(jsonData, oNodeRoot, startFrame);
+}
 
-    if (!jsonData.frames || !Array.isArray(jsonData.frames)) {
-        print("ERROR: GP art direction JSON missing 'frames' array");
+// Apply already-parsed art-direction frames (split out of applyGPArtDirection so
+// DTH Character Studio's single-file script can pass the data inline).
+function applyArtDirectionData(jsonData, oNodeRoot, startFrame) {
+    if (!jsonData || !jsonData.frames || !Array.isArray(jsonData.frames)) {
+        print("ERROR: art direction data missing 'frames' array");
         return false;
     }
 
@@ -1273,12 +1507,25 @@ function applyGPArtDirection(sJsonPath, oNodeRoot, startFrame) {
                     for (var m = 0; m < oObj.getNumModifiers(); m++) {
                         var mod = oObj.getModifier(m);
                         if (mod.getLabel() === morph.prop || mod.getName() === morph.prop) {
-                            if (mod.getValueChannel) oProp = mod.getValueChannel(0);
+                            if (mod.getValueChannel) oProp = mod.getValueChannel();
                             if (!oProp && mod.getValueControl) oProp = mod.getValueControl();
                             if (oProp) break;
                         }
                     }
                 }
+            }
+
+            // LAST RESORT: node property lookup. Geo-graft "preset" morphs (e.g.
+            // Golden Palace GP_PR_*) are exposed on the figure as alias PROPERTIES,
+            // not as modifiers on its object — so findModifier/getModifier miss
+            // them. findProperty catches them, same as the FBM path (applyKeyData).
+            if (!oProp) {
+                oProp = oNode.findProperty(morph.prop);
+                if (oProp) print("  Found via findProperty (fallback)");
+            }
+            if (!oProp) {
+                oProp = oNode.findPropertyByLabel(morph.prop);
+                if (oProp) print("  Found via findPropertyByLabel (fallback)");
             }
 
             if (!oProp) {
